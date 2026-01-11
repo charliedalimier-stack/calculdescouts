@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Search, MoreVertical, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit, Trash2, Loader2 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,55 +34,94 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
-
-interface Packaging {
-  id: string;
-  name: string;
-  pricePerUnit: number;
-  type: "primary" | "secondary" | "tertiary";
-  stock?: number;
-}
+import { usePackaging } from "@/hooks/usePackaging";
+import { useProject } from "@/contexts/ProjectContext";
 
 const packagingTypes = {
-  primary: { label: "Primaire", description: "En contact avec le produit" },
-  secondary: { label: "Secondaire", description: "Emballage de présentation" },
-  tertiary: { label: "Tertiaire", description: "Transport et stockage" },
+  primaire: { label: "Primaire", description: "En contact avec le produit" },
+  secondaire: { label: "Secondaire", description: "Emballage de présentation" },
+  tertiaire: { label: "Tertiaire", description: "Transport et stockage" },
 };
 
-const initialPackaging: Packaging[] = [
-  { id: "1", name: "Pot verre 250g", pricePerUnit: 0.45, type: "primary", stock: 500 },
-  { id: "2", name: "Pot verre 350g", pricePerUnit: 0.55, type: "primary", stock: 350 },
-  { id: "3", name: "Pot verre 180g", pricePerUnit: 0.38, type: "primary", stock: 400 },
-  { id: "4", name: "Bouteille verre 75cl", pricePerUnit: 0.65, type: "primary", stock: 200 },
-  { id: "5", name: "Couvercle métal twist-off", pricePerUnit: 0.12, type: "primary", stock: 1000 },
-  { id: "6", name: "Étiquette personnalisée", pricePerUnit: 0.08, type: "secondary", stock: 2000 },
-  { id: "7", name: "Carton 6 pots", pricePerUnit: 0.35, type: "secondary", stock: 150 },
-  { id: "8", name: "Palette bois", pricePerUnit: 8.00, type: "tertiary", stock: 20 },
-];
-
-const getTypeBadge = (type: Packaging["type"]) => {
+const getTypeBadge = (type: string | null) => {
   switch (type) {
-    case "primary":
-      return <Badge className="bg-primary/10 text-primary border-primary/20">{packagingTypes.primary.label}</Badge>;
-    case "secondary":
-      return <Badge className="bg-chart-3/10 text-chart-3 border-chart-3/20">{packagingTypes.secondary.label}</Badge>;
-    case "tertiary":
-      return <Badge variant="outline">{packagingTypes.tertiary.label}</Badge>;
+    case "primaire":
+      return <Badge className="bg-primary/10 text-primary border-primary/20">Primaire</Badge>;
+    case "secondaire":
+      return <Badge className="bg-chart-3/10 text-chart-3 border-chart-3/20">Secondaire</Badge>;
+    case "tertiaire":
+      return <Badge variant="outline">Tertiaire</Badge>;
+    default:
+      return <Badge variant="outline">-</Badge>;
   }
 };
 
 const Packaging = () => {
-  const [packaging, setPackaging] = useState<Packaging[]>(initialPackaging);
+  const { currentProject } = useProject();
+  const { packaging, isLoading, addPackaging, updatePackaging, deletePackaging } = usePackaging();
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    nom: "",
+    cout_unitaire: "",
+    unite: "unité",
+    type_emballage: "primaire",
+  });
 
   const filteredPackaging = packaging.filter((p) =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+    p.nom.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleDeletePackaging = (id: string) => {
-    setPackaging(packaging.filter((p) => p.id !== id));
+  const resetForm = () => {
+    setFormData({ nom: "", cout_unitaire: "", unite: "unité", type_emballage: "primaire" });
+    setEditingId(null);
   };
+
+  const handleSubmit = () => {
+    if (!formData.nom.trim()) return;
+
+    const data = {
+      nom: formData.nom,
+      cout_unitaire: parseFloat(formData.cout_unitaire) || 0,
+      unite: formData.unite,
+      type_emballage: formData.type_emballage,
+    };
+
+    if (editingId) {
+      updatePackaging.mutate({ id: editingId, ...data });
+    } else {
+      addPackaging.mutate(data);
+    }
+
+    setIsDialogOpen(false);
+    resetForm();
+  };
+
+  const handleEdit = (item: typeof packaging[0]) => {
+    setFormData({
+      nom: item.nom,
+      cout_unitaire: item.cout_unitaire.toString(),
+      unite: item.unite,
+      type_emballage: item.type_emballage || "primaire",
+    });
+    setEditingId(item.id);
+    setIsDialogOpen(true);
+  };
+
+  const handleDelete = (id: string) => {
+    deletePackaging.mutate(id);
+  };
+
+  if (!currentProject) {
+    return (
+      <AppLayout title="Emballages" subtitle="Sélectionnez un projet pour voir les emballages">
+        <Card className="p-8 text-center">
+          <p className="text-muted-foreground">Veuillez d'abord créer ou sélectionner un projet.</p>
+        </Card>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout
@@ -99,7 +138,7 @@ const Packaging = () => {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
@@ -108,21 +147,36 @@ const Packaging = () => {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Ajouter un emballage</DialogTitle>
+              <DialogTitle>{editingId ? "Modifier l'emballage" : "Ajouter un emballage"}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-4">
               <div className="space-y-2">
                 <Label htmlFor="packagingName">Nom de l'emballage</Label>
-                <Input id="packagingName" placeholder="Ex: Pot verre 250g" />
+                <Input
+                  id="packagingName"
+                  placeholder="Ex: Pot verre 250g"
+                  value={formData.nom}
+                  onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="price">Prix unitaire (€)</Label>
-                  <Input id="price" type="number" step="0.01" placeholder="0.00" />
+                  <Input
+                    id="price"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={formData.cout_unitaire}
+                    onChange={(e) => setFormData({ ...formData, cout_unitaire: e.target.value })}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="type">Type</Label>
-                  <Select>
+                  <Select
+                    value={formData.type_emballage}
+                    onValueChange={(value) => setFormData({ ...formData, type_emballage: value })}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Sélectionner" />
                     </SelectTrigger>
@@ -136,8 +190,15 @@ const Packaging = () => {
                   </Select>
                 </div>
               </div>
-              <Button className="w-full" onClick={() => setIsDialogOpen(false)}>
-                Ajouter l'emballage
+              <Button
+                className="w-full"
+                onClick={handleSubmit}
+                disabled={addPackaging.isPending || updatePackaging.isPending}
+              >
+                {(addPackaging.isPending || updatePackaging.isPending) && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                {editingId ? "Mettre à jour" : "Ajouter l'emballage"}
               </Button>
             </div>
           </DialogContent>
@@ -145,59 +206,59 @@ const Packaging = () => {
       </div>
 
       <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Emballage</TableHead>
-              <TableHead className="text-right">Prix unitaire</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead className="text-right">Stock</TableHead>
-              <TableHead className="w-12"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredPackaging.map((item) => (
-              <TableRow key={item.id}>
-                <TableCell className="font-medium">{item.name}</TableCell>
-                <TableCell className="text-right">
-                  {item.pricePerUnit.toFixed(2)} €
-                </TableCell>
-                <TableCell>{getTypeBadge(item.type)}</TableCell>
-                <TableCell className="text-right">
-                  {item.stock !== undefined ? (
-                    <span className={item.stock < 50 ? "text-destructive font-medium" : ""}>
-                      {item.stock} unités
-                    </span>
-                  ) : (
-                    "-"
-                  )}
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Modifier
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleDeletePackaging(item.id)}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Supprimer
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
+        {isLoading ? (
+          <div className="flex items-center justify-center p-8">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : filteredPackaging.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground">
+            {searchQuery ? "Aucun emballage trouvé" : "Aucun emballage. Ajoutez-en un !"}
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Emballage</TableHead>
+                <TableHead className="text-right">Prix unitaire</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead className="w-12"></TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {filteredPackaging.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell className="font-medium">{item.nom}</TableCell>
+                  <TableCell className="text-right">
+                    {Number(item.cout_unitaire).toFixed(2)} €
+                  </TableCell>
+                  <TableCell>{getTypeBadge(item.type_emballage)}</TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleEdit(item)}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Modifier
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleDelete(item.id)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Supprimer
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
     </AppLayout>
   );

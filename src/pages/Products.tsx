@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Search, Filter, MoreVertical, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, Filter, MoreVertical, Edit, Trash2, Loader2 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,106 +34,101 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
-
-interface Product {
-  id: string;
-  name: string;
-  category: string;
-  unit: string;
-  priceBTC: number;
-  priceBTB: number;
-  priceDistributor: number;
-  costPrice: number;
-  margin: number;
-}
-
-const categories = ["Sauces", "Confitures", "Terrines", "Boissons", "Miels"];
-
-const initialProducts: Product[] = [
-  {
-    id: "1",
-    name: "Sauce tomate bio",
-    category: "Sauces",
-    unit: "pot 250g",
-    priceBTC: 5.50,
-    priceBTB: 4.23,
-    priceDistributor: 3.60,
-    costPrice: 2.42,
-    margin: 45,
-  },
-  {
-    id: "2",
-    name: "Confiture de fraise",
-    category: "Confitures",
-    unit: "pot 350g",
-    priceBTC: 6.00,
-    priceBTB: 4.62,
-    priceDistributor: 3.92,
-    costPrice: 2.72,
-    margin: 38,
-  },
-  {
-    id: "3",
-    name: "Pesto basilic",
-    category: "Sauces",
-    unit: "pot 180g",
-    priceBTC: 7.50,
-    priceBTB: 5.77,
-    priceDistributor: 4.90,
-    costPrice: 2.88,
-    margin: 52,
-  },
-  {
-    id: "4",
-    name: "Terrine de porc",
-    category: "Terrines",
-    unit: "pot 200g",
-    priceBTC: 8.00,
-    priceBTB: 6.15,
-    priceDistributor: 5.23,
-    costPrice: 5.76,
-    margin: 18,
-  },
-  {
-    id: "5",
-    name: "Jus de pomme",
-    category: "Boissons",
-    unit: "bouteille 75cl",
-    priceBTC: 4.50,
-    priceBTB: 3.46,
-    priceDistributor: 2.94,
-    costPrice: 2.25,
-    margin: 35,
-  },
-];
+import { useProducts } from "@/hooks/useProducts";
+import { useCategories } from "@/hooks/useCategories";
+import { useProject } from "@/contexts/ProjectContext";
 
 const getMarginBadge = (margin: number) => {
   if (margin >= 40) {
-    return <Badge className="bg-primary/10 text-primary border-primary/20">{margin}%</Badge>;
+    return <Badge className="bg-primary/10 text-primary border-primary/20">{margin.toFixed(1)}%</Badge>;
   } else if (margin >= 30) {
-    return <Badge className="bg-chart-4/10 text-chart-4 border-chart-4/20">{margin}%</Badge>;
+    return <Badge className="bg-chart-4/10 text-chart-4 border-chart-4/20">{margin.toFixed(1)}%</Badge>;
   }
-  return <Badge className="bg-destructive/10 text-destructive border-destructive/20">{margin}%</Badge>;
+  return <Badge className="bg-destructive/10 text-destructive border-destructive/20">{margin.toFixed(1)}%</Badge>;
 };
 
 const Products = () => {
-  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const { currentProject } = useProject();
+  const { productsWithCosts, isLoading, addProduct, updateProduct, deleteProduct } = useProducts();
+  const { categories, addCategory } = useCategories();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    nom_produit: "",
+    categorie_id: "",
+    unite_vente: "pièce",
+    prix_btc: "",
+  });
+  const [newCategory, setNewCategory] = useState("");
 
-  const filteredProducts = products.filter((product) => {
-    const matchesSearch = product.name
+  const filteredProducts = productsWithCosts.filter((product) => {
+    const matchesSearch = product.nom_produit
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
     const matchesCategory =
-      !selectedCategory || product.category === selectedCategory;
+      !selectedCategory || selectedCategory === "all" || product.categorie_id === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
-  const handleDeleteProduct = (id: string) => {
-    setProducts(products.filter((p) => p.id !== id));
+  const resetForm = () => {
+    setFormData({ nom_produit: "", categorie_id: "", unite_vente: "pièce", prix_btc: "" });
+    setEditingId(null);
+    setNewCategory("");
   };
+
+  const handleSubmit = () => {
+    if (!formData.nom_produit.trim()) return;
+
+    const data = {
+      nom_produit: formData.nom_produit,
+      categorie_id: formData.categorie_id || null,
+      unite_vente: formData.unite_vente,
+      prix_btc: parseFloat(formData.prix_btc) || 0,
+    };
+
+    if (editingId) {
+      updateProduct.mutate({ id: editingId, ...data });
+    } else {
+      addProduct.mutate(data);
+    }
+
+    setIsDialogOpen(false);
+    resetForm();
+  };
+
+  const handleEdit = (product: typeof productsWithCosts[0]) => {
+    setFormData({
+      nom_produit: product.nom_produit,
+      categorie_id: product.categorie_id || "",
+      unite_vente: product.unite_vente,
+      prix_btc: product.prix_btc.toString(),
+    });
+    setEditingId(product.id);
+    setIsDialogOpen(true);
+  };
+
+  const handleDelete = (id: string) => {
+    deleteProduct.mutate(id);
+  };
+
+  const handleAddCategory = () => {
+    if (newCategory.trim()) {
+      addCategory.mutate(newCategory.trim());
+      setNewCategory("");
+    }
+  };
+
+  if (!currentProject) {
+    return (
+      <AppLayout title="Produits" subtitle="Sélectionnez un projet pour voir les produits">
+        <Card className="p-8 text-center">
+          <p className="text-muted-foreground">Veuillez d'abord créer ou sélectionner un projet.</p>
+        </Card>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout
@@ -159,14 +154,14 @@ const Products = () => {
             <SelectContent>
               <SelectItem value="all">Toutes</SelectItem>
               {categories.map((cat) => (
-                <SelectItem key={cat} value={cat}>
-                  {cat}
+                <SelectItem key={cat.id} value={cat.id}>
+                  {cat.nom_categorie}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
@@ -175,43 +170,81 @@ const Products = () => {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Ajouter un produit</DialogTitle>
+              <DialogTitle>{editingId ? "Modifier le produit" : "Ajouter un produit"}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-4">
               <div className="space-y-2">
                 <Label htmlFor="productName">Nom du produit</Label>
-                <Input id="productName" placeholder="Ex: Sauce tomate bio" />
+                <Input
+                  id="productName"
+                  placeholder="Ex: Sauce tomate bio"
+                  value={formData.nom_produit}
+                  onChange={(e) => setFormData({ ...formData, nom_produit: e.target.value })}
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="category">Catégorie</Label>
-                  <Select>
+                  <Select
+                    value={formData.categorie_id}
+                    onValueChange={(value) => setFormData({ ...formData, categorie_id: value })}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Sélectionner" />
                     </SelectTrigger>
                     <SelectContent>
                       {categories.map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.nom_categorie}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Nouvelle catégorie"
+                      value={newCategory}
+                      onChange={(e) => setNewCategory(e.target.value)}
+                      className="text-xs"
+                    />
+                    <Button size="sm" variant="outline" onClick={handleAddCategory}>
+                      +
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="unit">Unité de vente</Label>
-                  <Input id="unit" placeholder="Ex: pot 250g" />
+                  <Input
+                    id="unit"
+                    placeholder="Ex: pot 250g"
+                    value={formData.unite_vente}
+                    onChange={(e) => setFormData({ ...formData, unite_vente: e.target.value })}
+                  />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="priceBTC">Prix BTC (€)</Label>
-                <Input id="priceBTC" type="number" step="0.01" placeholder="0.00" />
+                <Input
+                  id="priceBTC"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={formData.prix_btc}
+                  onChange={(e) => setFormData({ ...formData, prix_btc: e.target.value })}
+                />
               </div>
               <p className="text-xs text-muted-foreground">
-                Les prix BTB et Distributeur seront calculés automatiquement selon les coefficients définis.
+                Les prix BTB (×0.70) et Distributeur (×0.85 du BTB) sont calculés automatiquement.
               </p>
-              <Button className="w-full" onClick={() => setIsDialogOpen(false)}>
-                Ajouter le produit
+              <Button
+                className="w-full"
+                onClick={handleSubmit}
+                disabled={addProduct.isPending || updateProduct.isPending}
+              >
+                {(addProduct.isPending || updateProduct.isPending) && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                {editingId ? "Mettre à jour" : "Ajouter le produit"}
               </Button>
             </div>
           </DialogContent>
@@ -219,71 +252,81 @@ const Products = () => {
       </div>
 
       <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Produit</TableHead>
-              <TableHead>Catégorie</TableHead>
-              <TableHead>Unité</TableHead>
-              <TableHead className="text-right">Prix BTC</TableHead>
-              <TableHead className="text-right">Prix BTB</TableHead>
-              <TableHead className="text-right">Prix Distrib.</TableHead>
-              <TableHead className="text-right">Coût revient</TableHead>
-              <TableHead className="text-center">Marge</TableHead>
-              <TableHead className="w-12"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredProducts.map((product) => (
-              <TableRow key={product.id}>
-                <TableCell className="font-medium">{product.name}</TableCell>
-                <TableCell>
-                  <Badge variant="outline">{product.category}</Badge>
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {product.unit}
-                </TableCell>
-                <TableCell className="text-right">
-                  {product.priceBTC.toFixed(2)} €
-                </TableCell>
-                <TableCell className="text-right text-muted-foreground">
-                  {product.priceBTB.toFixed(2)} €
-                </TableCell>
-                <TableCell className="text-right text-muted-foreground">
-                  {product.priceDistributor.toFixed(2)} €
-                </TableCell>
-                <TableCell className="text-right">
-                  {product.costPrice.toFixed(2)} €
-                </TableCell>
-                <TableCell className="text-center">
-                  {getMarginBadge(product.margin)}
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Modifier
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleDeleteProduct(product.id)}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Supprimer
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
+        {isLoading ? (
+          <div className="flex items-center justify-center p-8">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground">
+            {searchQuery ? "Aucun produit trouvé" : "Aucun produit. Ajoutez-en un !"}
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Produit</TableHead>
+                <TableHead>Catégorie</TableHead>
+                <TableHead>Unité</TableHead>
+                <TableHead className="text-right">Prix BTC</TableHead>
+                <TableHead className="text-right">Prix BTB</TableHead>
+                <TableHead className="text-right">Prix Distrib.</TableHead>
+                <TableHead className="text-right">Coût revient</TableHead>
+                <TableHead className="text-center">Marge</TableHead>
+                <TableHead className="w-12"></TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {filteredProducts.map((product) => (
+                <TableRow key={product.id}>
+                  <TableCell className="font-medium">{product.nom_produit}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{product.category_name || "-"}</Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {product.unite_vente}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {Number(product.prix_btc).toFixed(2)} €
+                  </TableCell>
+                  <TableCell className="text-right text-muted-foreground">
+                    {product.prix_btb.toFixed(2)} €
+                  </TableCell>
+                  <TableCell className="text-right text-muted-foreground">
+                    {product.prix_distributor.toFixed(2)} €
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {product.cost_total.toFixed(2)} €
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {getMarginBadge(product.margin)}
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleEdit(product)}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Modifier
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleDelete(product.id)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Supprimer
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
     </AppLayout>
   );

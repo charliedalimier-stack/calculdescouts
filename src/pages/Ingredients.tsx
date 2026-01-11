@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Search, MoreVertical, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit, Trash2, Loader2 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,39 +27,75 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-
-interface Ingredient {
-  id: string;
-  name: string;
-  pricePerUnit: number;
-  unit: string;
-  supplier?: string;
-  stock?: number;
-}
-
-const initialIngredients: Ingredient[] = [
-  { id: "1", name: "Tomates pelées bio", pricePerUnit: 2.80, unit: "kg", supplier: "Coopérative Bio Sud", stock: 50 },
-  { id: "2", name: "Fraises fraîches", pricePerUnit: 6.50, unit: "kg", supplier: "Ferme des Fruits", stock: 25 },
-  { id: "3", name: "Basilic frais", pricePerUnit: 15.00, unit: "kg", supplier: "Herbes de Provence", stock: 5 },
-  { id: "4", name: "Huile d'olive", pricePerUnit: 12.00, unit: "L", supplier: "Moulin du Var", stock: 20 },
-  { id: "5", name: "Sucre de canne", pricePerUnit: 1.80, unit: "kg", supplier: "Sucre Bio", stock: 100 },
-  { id: "6", name: "Pignons de pin", pricePerUnit: 45.00, unit: "kg", supplier: "Fruits Secs Premium", stock: 3 },
-  { id: "7", name: "Ail bio", pricePerUnit: 8.00, unit: "kg", supplier: "Coopérative Bio Sud", stock: 10 },
-  { id: "8", name: "Parmesan AOP", pricePerUnit: 28.00, unit: "kg", supplier: "Italia Import", stock: 8 },
-];
+import { useIngredients } from "@/hooks/useIngredients";
+import { useProject } from "@/contexts/ProjectContext";
 
 const Ingredients = () => {
-  const [ingredients, setIngredients] = useState<Ingredient[]>(initialIngredients);
+  const { currentProject } = useProject();
+  const { ingredients, isLoading, addIngredient, updateIngredient, deleteIngredient } = useIngredients();
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    nom_ingredient: "",
+    cout_unitaire: "",
+    unite: "kg",
+    fournisseur: "",
+  });
 
   const filteredIngredients = ingredients.filter((ing) =>
-    ing.name.toLowerCase().includes(searchQuery.toLowerCase())
+    ing.nom_ingredient.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleDeleteIngredient = (id: string) => {
-    setIngredients(ingredients.filter((i) => i.id !== id));
+  const resetForm = () => {
+    setFormData({ nom_ingredient: "", cout_unitaire: "", unite: "kg", fournisseur: "" });
+    setEditingId(null);
   };
+
+  const handleSubmit = () => {
+    if (!formData.nom_ingredient.trim()) return;
+
+    const data = {
+      nom_ingredient: formData.nom_ingredient,
+      cout_unitaire: parseFloat(formData.cout_unitaire) || 0,
+      unite: formData.unite,
+      fournisseur: formData.fournisseur || null,
+    };
+
+    if (editingId) {
+      updateIngredient.mutate({ id: editingId, ...data });
+    } else {
+      addIngredient.mutate(data);
+    }
+
+    setIsDialogOpen(false);
+    resetForm();
+  };
+
+  const handleEdit = (ingredient: typeof ingredients[0]) => {
+    setFormData({
+      nom_ingredient: ingredient.nom_ingredient,
+      cout_unitaire: ingredient.cout_unitaire.toString(),
+      unite: ingredient.unite,
+      fournisseur: ingredient.fournisseur || "",
+    });
+    setEditingId(ingredient.id);
+    setIsDialogOpen(true);
+  };
+
+  const handleDelete = (id: string) => {
+    deleteIngredient.mutate(id);
+  };
+
+  if (!currentProject) {
+    return (
+      <AppLayout title="Ingrédients" subtitle="Sélectionnez un projet pour voir les ingrédients">
+        <Card className="p-8 text-center">
+          <p className="text-muted-foreground">Veuillez d'abord créer ou sélectionner un projet.</p>
+        </Card>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout
@@ -76,7 +112,7 @@ const Ingredients = () => {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
@@ -85,29 +121,58 @@ const Ingredients = () => {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Ajouter un ingrédient</DialogTitle>
+              <DialogTitle>{editingId ? "Modifier l'ingrédient" : "Ajouter un ingrédient"}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-4">
               <div className="space-y-2">
                 <Label htmlFor="ingredientName">Nom de l'ingrédient</Label>
-                <Input id="ingredientName" placeholder="Ex: Tomates pelées bio" />
+                <Input
+                  id="ingredientName"
+                  placeholder="Ex: Tomates pelées bio"
+                  value={formData.nom_ingredient}
+                  onChange={(e) => setFormData({ ...formData, nom_ingredient: e.target.value })}
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="price">Prix unitaire (€)</Label>
-                  <Input id="price" type="number" step="0.01" placeholder="0.00" />
+                  <Input
+                    id="price"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={formData.cout_unitaire}
+                    onChange={(e) => setFormData({ ...formData, cout_unitaire: e.target.value })}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="unit">Unité</Label>
-                  <Input id="unit" placeholder="Ex: kg, L, pièce" />
+                  <Input
+                    id="unit"
+                    placeholder="Ex: kg, L, pièce"
+                    value={formData.unite}
+                    onChange={(e) => setFormData({ ...formData, unite: e.target.value })}
+                  />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="supplier">Fournisseur (optionnel)</Label>
-                <Input id="supplier" placeholder="Ex: Coopérative Bio Sud" />
+                <Input
+                  id="supplier"
+                  placeholder="Ex: Coopérative Bio Sud"
+                  value={formData.fournisseur}
+                  onChange={(e) => setFormData({ ...formData, fournisseur: e.target.value })}
+                />
               </div>
-              <Button className="w-full" onClick={() => setIsDialogOpen(false)}>
-                Ajouter l'ingrédient
+              <Button
+                className="w-full"
+                onClick={handleSubmit}
+                disabled={addIngredient.isPending || updateIngredient.isPending}
+              >
+                {(addIngredient.isPending || updateIngredient.isPending) && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                {editingId ? "Mettre à jour" : "Ajouter l'ingrédient"}
               </Button>
             </div>
           </DialogContent>
@@ -115,65 +180,65 @@ const Ingredients = () => {
       </div>
 
       <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Ingrédient</TableHead>
-              <TableHead className="text-right">Prix unitaire</TableHead>
-              <TableHead>Unité</TableHead>
-              <TableHead>Fournisseur</TableHead>
-              <TableHead className="text-right">Stock</TableHead>
-              <TableHead className="w-12"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredIngredients.map((ingredient) => (
-              <TableRow key={ingredient.id}>
-                <TableCell className="font-medium">{ingredient.name}</TableCell>
-                <TableCell className="text-right">
-                  {ingredient.pricePerUnit.toFixed(2)} €
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline">{ingredient.unit}</Badge>
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {ingredient.supplier || "-"}
-                </TableCell>
-                <TableCell className="text-right">
-                  {ingredient.stock !== undefined ? (
-                    <span className={ingredient.stock < 10 ? "text-destructive font-medium" : ""}>
-                      {ingredient.stock} {ingredient.unit}
-                    </span>
-                  ) : (
-                    "-"
-                  )}
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Modifier
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleDeleteIngredient(ingredient.id)}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Supprimer
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
+        {isLoading ? (
+          <div className="flex items-center justify-center p-8">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : filteredIngredients.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground">
+            {searchQuery ? "Aucun ingrédient trouvé" : "Aucun ingrédient. Ajoutez-en un !"}
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Ingrédient</TableHead>
+                <TableHead className="text-right">Prix unitaire</TableHead>
+                <TableHead>Unité</TableHead>
+                <TableHead>Fournisseur</TableHead>
+                <TableHead className="w-12"></TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {filteredIngredients.map((ingredient) => (
+                <TableRow key={ingredient.id}>
+                  <TableCell className="font-medium">{ingredient.nom_ingredient}</TableCell>
+                  <TableCell className="text-right">
+                    {Number(ingredient.cout_unitaire).toFixed(2)} €
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{ingredient.unite}</Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {ingredient.fournisseur || "-"}
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleEdit(ingredient)}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Modifier
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleDelete(ingredient.id)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Supprimer
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
     </AppLayout>
   );

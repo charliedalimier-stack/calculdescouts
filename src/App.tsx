@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ProjectProvider } from "@/contexts/ProjectContext";
 import Index from "./pages/Index";
 import Projects from "./pages/Projects";
 import Products from "./pages/Products";
@@ -20,26 +21,28 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/projects" element={<Projects />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/ingredients" element={<Ingredients />} />
-          <Route path="/packaging" element={<Packaging />} />
-          <Route path="/recipes" element={<Recipes />} />
-          <Route path="/pricing" element={<Pricing />} />
-          <Route path="/sales" element={<Sales />} />
-          <Route path="/cashflow" element={<CashFlow />} />
-          <Route path="/analysis" element={<Analysis />} />
-          <Route path="/matrix" element={<Matrix />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+    <ProjectProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/projects" element={<Projects />} />
+            <Route path="/products" element={<Products />} />
+            <Route path="/ingredients" element={<Ingredients />} />
+            <Route path="/packaging" element={<Packaging />} />
+            <Route path="/recipes" element={<Recipes />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/sales" element={<Sales />} />
+            <Route path="/cashflow" element={<CashFlow />} />
+            <Route path="/analysis" element={<Analysis />} />
+            <Route path="/matrix" element={<Matrix />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </ProjectProvider>
   </QueryClientProvider>
 );
 

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '@/contexts/ProjectContext';
+import { useMode } from '@/contexts/ModeContext';
 import { toast } from 'sonner';
 
 export interface Packaging {
@@ -10,6 +11,8 @@ export interface Packaging {
   unite: string;
   type_emballage: string | null;
   project_id: string;
+  mode: 'simulation' | 'reel';
+  tva_taux: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -20,14 +23,17 @@ export interface PackagingInsert {
   unite: string;
   type_emballage?: string | null;
   project_id: string;
+  mode?: 'simulation' | 'reel';
+  tva_taux?: number | null;
 }
 
 export function usePackaging() {
   const { currentProject } = useProject();
+  const { mode } = useMode();
   const queryClient = useQueryClient();
 
   const { data: packaging = [], isLoading, error } = useQuery({
-    queryKey: ['packaging', currentProject?.id],
+    queryKey: ['packaging', currentProject?.id, mode],
     queryFn: async () => {
       if (!currentProject?.id) return [];
       
@@ -35,21 +41,22 @@ export function usePackaging() {
         .from('packaging')
         .select('*')
         .eq('project_id', currentProject.id)
+        .eq('mode', mode)
         .order('nom');
       
       if (error) throw error;
-      return data as Packaging[];
+      return data.map(d => ({ ...d, mode: d.mode as 'simulation' | 'reel' })) as Packaging[];
     },
     enabled: !!currentProject?.id,
   });
 
   const addPackaging = useMutation({
-    mutationFn: async (item: Omit<PackagingInsert, 'project_id'>) => {
+    mutationFn: async (item: Omit<PackagingInsert, 'project_id' | 'mode'>) => {
       if (!currentProject?.id) throw new Error('Aucun projet sélectionné');
       
       const { data, error } = await supabase
         .from('packaging')
-        .insert({ ...item, project_id: currentProject.id })
+        .insert({ ...item, project_id: currentProject.id, mode })
         .select()
         .single();
       
@@ -57,7 +64,7 @@ export function usePackaging() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['packaging', currentProject?.id] });
+      queryClient.invalidateQueries({ queryKey: ['packaging', currentProject?.id, mode] });
       toast.success('Emballage ajouté avec succès');
     },
     onError: (error) => {
@@ -78,7 +85,7 @@ export function usePackaging() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['packaging', currentProject?.id] });
+      queryClient.invalidateQueries({ queryKey: ['packaging', currentProject?.id, mode] });
       queryClient.invalidateQueries({ queryKey: ['products-with-costs'] });
       toast.success('Emballage mis à jour');
     },
@@ -108,7 +115,7 @@ export function usePackaging() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['packaging', currentProject?.id] });
+      queryClient.invalidateQueries({ queryKey: ['packaging', currentProject?.id, mode] });
       toast.success('Emballage supprimé');
     },
     onError: (error) => {

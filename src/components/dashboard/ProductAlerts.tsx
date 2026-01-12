@@ -1,41 +1,17 @@
-import { AlertTriangle, TrendingDown, TrendingUp, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, TrendingDown, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useProducts } from "@/hooks/useProducts";
+import { useProjectSettings } from "@/hooks/useProjectSettings";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Alert {
   product: string;
   type: "danger" | "warning" | "success";
   message: string;
-  value?: string;
+  value: string;
 }
-
-const alerts: Alert[] = [
-  {
-    product: "Rillettes",
-    type: "danger",
-    message: "Marge insuffisante",
-    value: "22%",
-  },
-  {
-    product: "Terrine porc",
-    type: "danger",
-    message: "Coefficient trop bas",
-    value: "1.8x",
-  },
-  {
-    product: "Jus pomme",
-    type: "warning",
-    message: "Marge limite",
-    value: "35%",
-  },
-  {
-    product: "Pesto basilic",
-    type: "success",
-    message: "Très performant",
-    value: "52%",
-  },
-];
 
 const getAlertStyles = (type: Alert["type"]) => {
   switch (type) {
@@ -61,6 +37,79 @@ const getAlertStyles = (type: Alert["type"]) => {
 };
 
 export function ProductAlerts() {
+  const { productsWithCosts, isLoadingWithCosts } = useProducts();
+  const { settings, isLoading: isLoadingSettings } = useProjectSettings();
+
+  const isLoading = isLoadingWithCosts || isLoadingSettings;
+
+  // Generate alerts based on actual product data
+  const alerts: Alert[] = (productsWithCosts || [])
+    .map((product): Alert | null => {
+      const margin = product.margin;
+      const coefficient = product.coefficient;
+
+      const margeMin = settings?.marge_min ?? 30;
+      const margeCible = settings?.marge_cible ?? 40;
+      const coeffMin = settings?.coefficient_min ?? 2;
+
+      // Determine alert type and message
+      if (margin < margeMin) {
+        return {
+          product: product.nom_produit,
+          type: "danger",
+          message: "Marge insuffisante",
+          value: `${margin.toFixed(0)}%`,
+        };
+      } else if (coefficient > 0 && coefficient < coeffMin) {
+        return {
+          product: product.nom_produit,
+          type: "danger",
+          message: "Coefficient trop bas",
+          value: `${coefficient.toFixed(1)}x`,
+        };
+      } else if (margin >= margeMin && margin < margeCible) {
+        return {
+          product: product.nom_produit,
+          type: "warning",
+          message: "Marge limite",
+          value: `${margin.toFixed(0)}%`,
+        };
+      } else if (margin >= margeCible) {
+        return {
+          product: product.nom_produit,
+          type: "success",
+          message: "Très performant",
+          value: `${margin.toFixed(0)}%`,
+        };
+      }
+      return null;
+    })
+    .filter((alert): alert is Alert => alert !== null)
+    // Sort by priority: danger first, then warning, then success
+    .sort((a, b) => {
+      const priority = { danger: 0, warning: 1, success: 2 };
+      return priority[a.type] - priority[b.type];
+    })
+    .slice(0, 6); // Limit to 6 alerts
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            Alertes produits
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Skeleton className="h-[60px]" />
+          <Skeleton className="h-[60px]" />
+          <Skeleton className="h-[60px]" />
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -70,30 +119,36 @@ export function ProductAlerts() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {alerts.map((alert, index) => {
-          const styles = getAlertStyles(alert.type);
-          const Icon = styles.icon;
+        {alerts.length === 0 ? (
+          <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+            Aucun produit à analyser
+          </div>
+        ) : (
+          alerts.map((alert, index) => {
+            const styles = getAlertStyles(alert.type);
+            const Icon = styles.icon;
 
-          return (
-            <div
-              key={index}
-              className="flex items-center justify-between rounded-lg border border-border bg-card p-3"
-            >
-              <div className="flex items-center gap-3">
-                <Icon className={cn("h-4 w-4", styles.iconClass)} />
-                <div>
-                  <p className="text-sm font-medium text-foreground">
-                    {alert.product}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{alert.message}</p>
+            return (
+              <div
+                key={index}
+                className="flex items-center justify-between rounded-lg border border-border bg-card p-3"
+              >
+                <div className="flex items-center gap-3">
+                  <Icon className={cn("h-4 w-4", styles.iconClass)} />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      {alert.product}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{alert.message}</p>
+                  </div>
                 </div>
+                <Badge variant="outline" className={styles.badgeClass}>
+                  {alert.value}
+                </Badge>
               </div>
-              <Badge variant="outline" className={styles.badgeClass}>
-                {alert.value}
-              </Badge>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </CardContent>
     </Card>
   );

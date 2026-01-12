@@ -7,6 +7,7 @@ interface TVASummaryCardsProps {
   tvaNette: number;
   tauxVente: number;
   tauxAchat: number;
+  isFranchise?: boolean;
 }
 
 export function TVASummaryCards({
@@ -15,6 +16,7 @@ export function TVASummaryCards({
   tvaNette,
   tauxVente,
   tauxAchat,
+  isFranchise = false,
 }: TVASummaryCardsProps) {
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("fr-FR", {
@@ -33,10 +35,10 @@ export function TVASummaryCards({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-green-600">
-            {formatCurrency(tvaCollectee)}
+            {isFranchise ? "N/A" : formatCurrency(tvaCollectee)}
           </div>
           <p className="text-xs text-muted-foreground">
-            Taux par défaut: {tauxVente}%
+            {isFranchise ? "Franchise de taxe" : `Taux par défaut: ${tauxVente}%`}
           </p>
         </CardContent>
       </Card>
@@ -50,10 +52,10 @@ export function TVASummaryCards({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-blue-600">
-            {formatCurrency(tvaDeductible)}
+            {isFranchise ? "N/A" : formatCurrency(tvaDeductible)}
           </div>
           <p className="text-xs text-muted-foreground">
-            Taux par défaut: {tauxAchat}%
+            {isFranchise ? "Franchise de taxe" : `Taux par défaut: ${tauxAchat}%`}
           </p>
         </CardContent>
       </Card>
@@ -76,13 +78,13 @@ export function TVASummaryCards({
         <CardContent>
           <div
             className={`text-2xl font-bold ${
-              tvaNette >= 0 ? "text-amber-600" : "text-green-600"
+              isFranchise ? "text-muted-foreground" : tvaNette >= 0 ? "text-amber-600" : "text-green-600"
             }`}
           >
-            {formatCurrency(tvaNette)}
+            {isFranchise ? "N/A" : formatCurrency(tvaNette)}
           </div>
           <p className="text-xs text-muted-foreground">
-            {tvaNette >= 0 ? "À reverser" : "Crédit de TVA"}
+            {isFranchise ? "Non applicable" : tvaNette >= 0 ? "À reverser" : "Crédit de TVA"}
           </p>
         </CardContent>
       </Card>
@@ -97,13 +99,13 @@ export function TVASummaryCards({
         <CardContent>
           <div
             className={`text-2xl font-bold ${
-              tvaNette <= 0 ? "text-green-600" : "text-red-600"
+              isFranchise ? "text-muted-foreground" : tvaNette <= 0 ? "text-green-600" : "text-red-600"
             }`}
           >
-            {formatCurrency(-tvaNette)}
+            {isFranchise ? "N/A" : formatCurrency(-tvaNette)}
           </div>
           <p className="text-xs text-muted-foreground">
-            {tvaNette <= 0 ? "Remboursement attendu" : "Décaissement prévu"}
+            {isFranchise ? "Non applicable" : tvaNette <= 0 ? "Remboursement attendu" : "Décaissement prévu"}
           </p>
         </CardContent>
       </Card>

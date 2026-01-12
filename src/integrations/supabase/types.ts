@@ -577,9 +577,14 @@ export type Database = {
           marge_cible: number
           marge_distributeur: number
           marge_min: number
+          pays: string
           project_id: string
+          regime_tva: string
           seuil_stock_alerte: number
           tva_achat: number
+          tva_reduit_1: number
+          tva_reduit_2: number
+          tva_standard: number
           tva_vente: number
           updated_at: string
         }
@@ -594,9 +599,14 @@ export type Database = {
           marge_cible?: number
           marge_distributeur?: number
           marge_min?: number
+          pays?: string
           project_id: string
+          regime_tva?: string
           seuil_stock_alerte?: number
           tva_achat?: number
+          tva_reduit_1?: number
+          tva_reduit_2?: number
+          tva_standard?: number
           tva_vente?: number
           updated_at?: string
         }
@@ -611,9 +621,14 @@ export type Database = {
           marge_cible?: number
           marge_distributeur?: number
           marge_min?: number
+          pays?: string
           project_id?: string
+          regime_tva?: string
           seuil_stock_alerte?: number
           tva_achat?: number
+          tva_reduit_1?: number
+          tva_reduit_2?: number
+          tva_standard?: number
           tva_vente?: number
           updated_at?: string
         }

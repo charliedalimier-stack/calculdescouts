@@ -160,8 +160,11 @@ export function useTVA(month?: string) {
     enabled: !!projectId,
   });
 
+  // Check if franchise regime (no VAT applicable)
+  const isFranchise = settings?.regime_tva === 'franchise_taxe';
+
   // Calculate TVA collectée (on sales)
-  const defaultTvaVente = settings?.tva_vente || 5.5;
+  const defaultTvaVente = settings?.tva_vente || 6; // Belgian default
   const detailCollectee = salesData.map((sale) => {
     const product = sale.product as { nom_produit: string; prix_btc: number; tva_taux: number | null } | null;
     if (!product) return null;
@@ -170,15 +173,18 @@ export function useTVA(month?: string) {
     const caHT = sale.quantite_reelle * product.prix_btc;
     const tva = caHT * (tauxTva / 100);
 
+    // If franchise regime, no VAT is collected
+    const tvaAmount = isFranchise ? 0 : caHT * (tauxTva / 100);
+
     return {
       produit: product.nom_produit,
       ca_ht: caHT,
-      taux_tva: tauxTva,
-      tva,
+      taux_tva: isFranchise ? 0 : tauxTva,
+      tva: tvaAmount,
     };
   }).filter(Boolean) as TVASummary["detailCollectee"];
 
-  const tvaCollectee = detailCollectee.reduce((sum, d) => sum + d.tva, 0);
+  const tvaCollectee = isFranchise ? 0 : detailCollectee.reduce((sum, d) => sum + d.tva, 0);
 
   // Calculate TVA déductible (on purchases from stock entries)
   const detailDeductible: TVASummary["detailDeductible"] = [];
@@ -193,7 +199,7 @@ export function useTVA(month?: string) {
     if (!stock) return;
 
     const montantHT = movement.quantite * (movement.cout_unitaire || 0);
-    let tauxTva = settings?.tva_achat || 20;
+    let tauxTva = settings?.tva_achat || 21; // Belgian default
     let nom = "N/A";
     let type: "ingredient" | "packaging" | "variable_cost" = "ingredient";
 
@@ -207,16 +213,19 @@ export function useTVA(month?: string) {
       type = "packaging";
     }
 
+    // If franchise regime, no VAT is deductible
+    const tvaAmount = isFranchise ? 0 : montantHT * (tauxTva / 100);
+
     detailDeductible.push({
       type,
       nom,
       montant_ht: montantHT,
-      taux_tva: tauxTva,
-      tva: montantHT * (tauxTva / 100),
+      taux_tva: isFranchise ? 0 : tauxTva,
+      tva: tvaAmount,
     });
   });
 
-  const tvaDeductible = detailDeductible.reduce((sum, d) => sum + d.tva, 0);
+  const tvaDeductible = isFranchise ? 0 : detailDeductible.reduce((sum, d) => sum + d.tva, 0);
   const tvaNette = tvaCollectee - tvaDeductible;
 
   const summary: TVASummary = {
@@ -233,7 +242,8 @@ export function useTVA(month?: string) {
     tvaDeductible,
     tvaNette,
     defaultTvaVente,
-    defaultTvaAchat: settings?.tva_achat || 20,
+    defaultTvaAchat: settings?.tva_achat || 21, // Belgian default
+    isFranchise,
     isLoading: false,
   };
 }

@@ -201,8 +201,8 @@ const Pricing = () => {
                     <Info className="h-4 w-4 text-muted-foreground" />
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Taux de TVA applicable aux ventes</p>
-                    <p>5,5% alimentaire, 20% standard</p>
+                    <p>Taux de TVA applicable aux ventes (Belgique)</p>
+                    <p>6% alimentaire de base, 12% transformé, 21% standard</p>
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -214,7 +214,11 @@ const Pricing = () => {
                 value={settings.tva_vente}
                 onChange={(e) => handleTvaVenteChange(e.target.value)}
                 className="w-full"
+                disabled={settings.regime_tva === 'franchise_taxe'}
               />
+              {settings.regime_tva === 'franchise_taxe' && (
+                <p className="text-xs text-muted-foreground">Franchise de taxe active</p>
+              )}
             </div>
 
             {/* Coefficient cible */}

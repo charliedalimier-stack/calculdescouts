@@ -156,7 +156,8 @@ export function useProducts() {
     
     const margeBtb = settings?.marge_btb ?? 30;
     const margeDistributeur = settings?.marge_distributeur ?? 15;
-    const tvaVente = settings?.tva_vente ?? 5.5;
+    const tvaVente = settings?.tva_vente ?? 6; // Belgian default
+    const isFranchise = settings?.regime_tva === 'franchise_taxe';
 
     return rawProductsData.map(product => {
       const prixBtc = Number(product.prix_btc);
@@ -167,10 +168,11 @@ export function useProducts() {
       const prixBtb = prixBtc * (1 - margeBtb / 100);
       const prixDistributor = prixBtb * (1 - margeDistributeur / 100);
       
-      // TTC prices
-      const prixBtcTtc = prixBtc * (1 + productTva / 100);
-      const prixBtbTtc = prixBtb * (1 + productTva / 100);
-      const prixDistributorTtc = prixDistributor * (1 + productTva / 100);
+      // TTC prices - if franchise regime, no VAT is applied
+      const tvaMultiplier = isFranchise ? 1 : (1 + productTva / 100);
+      const prixBtcTtc = prixBtc * tvaMultiplier;
+      const prixBtbTtc = prixBtb * tvaMultiplier;
+      const prixDistributorTtc = prixDistributor * tvaMultiplier;
       
       // Margins (based on selling price)
       const margin = prixBtc > 0 ? ((prixBtc - costTotal) / prixBtc) * 100 : 0;
@@ -191,7 +193,7 @@ export function useProducts() {
         coefficient,
       };
     });
-  }, [rawProductsData, settings?.marge_btb, settings?.marge_distributeur, settings?.tva_vente]);
+  }, [rawProductsData, settings?.marge_btb, settings?.marge_distributeur, settings?.tva_vente, settings?.regime_tva]);
 
   const addProduct = useMutation({
     mutationFn: async (product: Omit<ProductInsert, 'project_id' | 'mode'>) => {

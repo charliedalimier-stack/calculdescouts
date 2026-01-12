@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '@/contexts/ProjectContext';
 import { toast } from 'sonner';
 
+export type VATRegime = 'assujetti_normal' | 'franchise_taxe';
+
 export interface ProjectSettings {
   id: string;
   project_id: string;
@@ -17,9 +19,22 @@ export interface ProjectSettings {
   seuil_stock_alerte: number;
   delai_paiement_client: number;
   delai_paiement_fournisseur: number;
+  // Belgian VAT fields
+  pays: string;
+  regime_tva: VATRegime;
+  tva_standard: number;
+  tva_reduit_1: number;
+  tva_reduit_2: number;
   created_at: string;
   updated_at: string;
 }
+
+// Belgian VAT rates
+export const BELGIAN_VAT_RATES = {
+  standard: 21,
+  reduced1: 12, // Certain processed food
+  reduced2: 6,  // Basic food products
+} as const;
 
 const defaultSettings: Omit<ProjectSettings, 'id' | 'project_id' | 'created_at' | 'updated_at'> = {
   coefficient_min: 2.0,
@@ -28,11 +43,17 @@ const defaultSettings: Omit<ProjectSettings, 'id' | 'project_id' | 'created_at' 
   marge_cible: 40,
   marge_btb: 30,
   marge_distributeur: 15,
-  tva_vente: 5.5,
-  tva_achat: 20,
+  tva_vente: 6,      // Belgian reduced rate for food
+  tva_achat: 21,     // Belgian standard rate
   seuil_stock_alerte: 10,
   delai_paiement_client: 30,
   delai_paiement_fournisseur: 30,
+  // Belgian VAT defaults
+  pays: 'Belgique',
+  regime_tva: 'assujetti_normal',
+  tva_standard: 21,
+  tva_reduit_1: 12,
+  tva_reduit_2: 6,
 };
 
 export function useProjectSettings() {
@@ -118,13 +139,36 @@ export function useProjectSettings() {
   };
 
   const calculateTTC = (prixHT: number, tauxTVA?: number) => {
-    const tva = tauxTVA ?? settings?.tva_vente ?? 5.5;
+    // If franchise_taxe regime, no VAT is applied
+    if (settings?.regime_tva === 'franchise_taxe') {
+      return prixHT;
+    }
+    const tva = tauxTVA ?? settings?.tva_vente ?? 6;
     return prixHT * (1 + tva / 100);
   };
 
   const calculateHT = (prixTTC: number, tauxTVA?: number) => {
-    const tva = tauxTVA ?? settings?.tva_vente ?? 5.5;
+    // If franchise_taxe regime, no VAT is applied
+    if (settings?.regime_tva === 'franchise_taxe') {
+      return prixTTC;
+    }
+    const tva = tauxTVA ?? settings?.tva_vente ?? 6;
     return prixTTC / (1 + tva / 100);
+  };
+
+  // Check if VAT applies (based on regime)
+  const isVATApplicable = () => {
+    return settings?.regime_tva !== 'franchise_taxe';
+  };
+
+  // Get available VAT rates for Belgium
+  const getAvailableVATRates = () => {
+    if (!settings) return [6, 12, 21];
+    return [
+      settings.tva_reduit_2, // 6%
+      settings.tva_reduit_1, // 12%
+      settings.tva_standard, // 21%
+    ];
   };
 
   return {
@@ -137,5 +181,8 @@ export function useProjectSettings() {
     calculatePrixDistributeur,
     calculateTTC,
     calculateHT,
+    isVATApplicable,
+    getAvailableVATRates,
+    BELGIAN_VAT_RATES,
   };
 }

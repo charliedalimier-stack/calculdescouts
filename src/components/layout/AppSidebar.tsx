@@ -13,6 +13,7 @@ import {
   FolderOpen,
   Settings,
   Activity,
+  Crosshair,
 } from "lucide-react";
 import {
   Sidebar,
@@ -48,6 +49,7 @@ const analysisNavItems = [
   { title: "Cash-flow", icon: Wallet, path: "/cashflow" },
   { title: "Analyses", icon: BarChart3, path: "/analysis" },
   { title: "Sensibilité", icon: Activity, path: "/sensitivity" },
+  { title: "Seuil rentabilité", icon: Crosshair, path: "/breakeven" },
   { title: "Matrice BCG", icon: Target, path: "/matrix" },
 ];
 

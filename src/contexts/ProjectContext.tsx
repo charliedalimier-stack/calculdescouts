@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/useAuth';
 
 interface Project {
   id: string;
@@ -8,6 +9,7 @@ interface Project {
   description: string | null;
   created_at: string;
   updated_at: string;
+  owner_user_id: string | null;
 }
 
 interface ProjectContextType {
@@ -22,10 +24,14 @@ const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
 export function ProjectProvider({ children }: { children: ReactNode }) {
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
+  const { user, isLoading: authLoading } = useAuth();
+  const queryClient = useQueryClient();
 
   const { data: projects = [], isLoading, refetch: refetchProjects } = useQuery({
-    queryKey: ['projects'],
+    queryKey: ['projects', user?.id],
     queryFn: async () => {
+      if (!user) return [];
+      
       const { data, error } = await supabase
         .from('projects')
         .select('*')
@@ -34,7 +40,16 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       if (error) throw error;
       return data as Project[];
     },
+    enabled: !!user,
   });
+
+  // Reset projects when user changes
+  useEffect(() => {
+    if (!user) {
+      setCurrentProject(null);
+      queryClient.removeQueries({ queryKey: ['projects'] });
+    }
+  }, [user, queryClient]);
 
   // Auto-select first project if none selected
   useEffect(() => {
@@ -49,7 +64,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         currentProject,
         setCurrentProject,
         projects,
-        isLoading,
+        isLoading: isLoading || authLoading,
         refetchProjects,
       }}
     >

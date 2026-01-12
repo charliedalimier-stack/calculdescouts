@@ -31,8 +31,9 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
-import { Wallet, TrendingUp, TrendingDown, AlertTriangle, Plus, Trash2 } from "lucide-react";
+import { Wallet, TrendingUp, TrendingDown, AlertTriangle, Plus, Trash2, Receipt } from "lucide-react";
 import { useCashFlow } from "@/hooks/useCashFlow";
+import { useExpenses } from "@/hooks/useExpenses";
 
 const getSoldeBadge = (solde: number) => {
   if (solde > 0) {
@@ -61,6 +62,8 @@ const CashFlow = () => {
     addCashFlowEntry,
     deleteCashFlowEntry,
   } = useCashFlow();
+  
+  const { summary: expensesSummary, isLoading: isLoadingExpenses } = useExpenses();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newEntry, setNewEntry] = useState({
@@ -86,11 +89,36 @@ const CashFlow = () => {
     });
   };
 
-  if (isLoading) {
+  // Calculate cash flow data with expenses
+  const cashFlowDataWithExpenses = cashFlowData.map(row => {
+    const monthKey = row.month.slice(0, 7);
+    const monthExpenses = expensesSummary.by_month[monthKey] || 0;
+    return {
+      ...row,
+      fraisPro: monthExpenses,
+      soldeApresFrais: row.solde - monthExpenses,
+    };
+  });
+
+  // Calculate cumulative with expenses
+  let cumulApresFrais = 0;
+  const cashFlowDataFinal = cashFlowDataWithExpenses.map(row => {
+    cumulApresFrais += row.soldeApresFrais;
+    return {
+      ...row,
+      cumulApresFrais,
+    };
+  });
+
+  const currentMonthExpenses = expensesSummary.by_month[new Date().toISOString().slice(0, 7)] || 0;
+  const soldeApresFrais = currentMonth.solde - currentMonthExpenses;
+  const hasNegativeAfterExpenses = cashFlowDataFinal.some(d => d.cumulApresFrais < 0);
+
+  if (isLoading || isLoadingExpenses) {
     return (
       <AppLayout title="Cash-flow" subtitle="Suivez votre trésorerie mensuelle">
         <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
+          {[...Array(6)].map((_, i) => (
             <Card key={i}>
               <CardContent className="p-6">
                 <Skeleton className="h-16 w-full" />
@@ -127,8 +155,23 @@ const CashFlow = () => {
         </Card>
       )}
 
-      {/* Summary Cards */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Alert for expenses impact */}
+      {hasNegativeAfterExpenses && !hasNegativeCashFlow && (
+        <Card className="mb-6 border-chart-4/50 bg-chart-4/5">
+          <CardContent className="flex items-center gap-4 p-4">
+            <Receipt className="h-5 w-5 text-chart-4" />
+            <div>
+              <p className="font-medium text-chart-4">Impact des frais professionnels</p>
+              <p className="text-sm text-muted-foreground">
+                Votre trésorerie production est positive, mais devient négative après prise en compte des frais professionnels.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Summary Cards - Row 1 */}
+      <div className="mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -150,7 +193,7 @@ const CashFlow = () => {
                 <TrendingDown className="h-5 w-5 text-destructive" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Décaissements</p>
+                <p className="text-sm text-muted-foreground">Décaissements (prod.)</p>
                 <p className="text-xl font-bold">{currentMonth.decaissements.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €</p>
               </div>
             </div>
@@ -160,15 +203,50 @@ const CashFlow = () => {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-chart-5/10">
+                <Receipt className="h-5 w-5 text-chart-5" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Frais professionnels</p>
+                <p className="text-xl font-bold">{currentMonthExpenses.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Summary Cards - Row 2 */}
+      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
               <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
                 currentMonth.solde >= 0 ? "bg-primary/10" : "bg-destructive/10"
               }`}>
                 <Wallet className={`h-5 w-5 ${currentMonth.solde >= 0 ? "text-primary" : "text-destructive"}`} />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Solde du mois</p>
+                <p className="text-sm text-muted-foreground">Solde production</p>
                 <p className={`text-xl font-bold ${currentMonth.solde >= 0 ? "text-primary" : "text-destructive"}`}>
                   {currentMonth.solde >= 0 ? "+" : ""}{currentMonth.solde.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+                soldeApresFrais >= 0 ? "bg-primary/10" : "bg-destructive/10"
+              }`}>
+                <Wallet className={`h-5 w-5 ${soldeApresFrais >= 0 ? "text-primary" : "text-destructive"}`} />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Solde après frais</p>
+                <p className={`text-xl font-bold ${soldeApresFrais >= 0 ? "text-primary" : "text-destructive"}`}>
+                  {soldeApresFrais >= 0 ? "+" : ""}{soldeApresFrais.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
                 </p>
               </div>
             </div>
@@ -191,7 +269,7 @@ const CashFlow = () => {
       </div>
 
       {/* Chart */}
-      {cashFlowData.length > 0 && (
+      {cashFlowDataFinal.length > 0 && (
         <Card className="mb-8">
           <CardHeader>
             <CardTitle className="text-base font-semibold">
@@ -201,11 +279,15 @@ const CashFlow = () => {
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={cashFlowData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <AreaChart data={cashFlowDataFinal} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorCumul" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.3} />
                       <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="colorCumulFrais" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -226,7 +308,7 @@ const CashFlow = () => {
                     }}
                     formatter={(value: number, name: string) => [
                       `${value.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €`,
-                      name === "cumul" ? "Trésorerie cumulée" : name === "encaissements" ? "Encaissements" : "Décaissements",
+                      name === "cumul" ? "Trésorerie production" : name === "cumulApresFrais" ? "Trésorerie après frais" : name === "encaissements" ? "Encaissements" : "Décaissements",
                     ]}
                   />
                   <Area
@@ -236,6 +318,16 @@ const CashFlow = () => {
                     strokeWidth={2}
                     fillOpacity={1}
                     fill="url(#colorCumul)"
+                    name="cumul"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="cumulApresFrais"
+                    stroke="hsl(var(--chart-2))"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#colorCumulFrais)"
+                    name="cumulApresFrais"
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -318,14 +410,16 @@ const CashFlow = () => {
                 <TableRow>
                   <TableHead>Mois</TableHead>
                   <TableHead className="text-right">Encaissements</TableHead>
-                  <TableHead className="text-right">Décaissements</TableHead>
-                  <TableHead className="text-center">Solde</TableHead>
+                  <TableHead className="text-right">Décaiss. prod.</TableHead>
+                  <TableHead className="text-right">Frais pro.</TableHead>
+                  <TableHead className="text-center">Solde prod.</TableHead>
+                  <TableHead className="text-center">Solde après frais</TableHead>
                   <TableHead className="text-right">Cumul</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {cashFlowData.map((row, index) => (
+                {cashFlowDataFinal.map((row, index) => (
                   <TableRow key={row.month}>
                     <TableCell className="font-medium">
                       {new Date(row.month).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
@@ -336,9 +430,13 @@ const CashFlow = () => {
                     <TableCell className="text-right text-destructive">
                       -{row.decaissements.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
                     </TableCell>
+                    <TableCell className="text-right text-chart-5">
+                      -{row.fraisPro.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
+                    </TableCell>
                     <TableCell className="text-center">{getSoldeBadge(row.solde)}</TableCell>
-                    <TableCell className={`text-right font-medium ${row.cumul >= 0 ? '' : 'text-destructive'}`}>
-                      {row.cumul.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
+                    <TableCell className="text-center">{getSoldeBadge(row.soldeApresFrais)}</TableCell>
+                    <TableCell className={`text-right font-medium ${row.cumulApresFrais >= 0 ? '' : 'text-destructive'}`}>
+                      {row.cumulApresFrais.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
                     </TableCell>
                     <TableCell>
                       <Button

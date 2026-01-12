@@ -1,7 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '@/contexts/ProjectContext';
+import { useMode } from '@/contexts/ModeContext';
 import { toast } from 'sonner';
+import { calculateProductCostRecursive } from './useSubRecipes';
 
 export interface RecipeIngredient {
   id: string;
@@ -37,8 +39,58 @@ export interface ProductVariableCost {
   line_cost: number;
 }
 
+// Function to sync ingredient from product recipe
+async function syncRecipeIngredient(
+  productId: string,
+  projectId: string,
+  mode: string
+): Promise<void> {
+  // Get the product details
+  const { data: product, error: productError } = await supabase
+    .from('products')
+    .select('nom_produit, unite_vente')
+    .eq('id', productId)
+    .single();
+
+  if (productError || !product) return;
+
+  // Calculate the cost recursively
+  const cost = await calculateProductCostRecursive(productId);
+
+  // Check if an ingredient already exists for this product
+  const { data: existingIngredient } = await supabase
+    .from('ingredients')
+    .select('id')
+    .eq('source_product_id', productId)
+    .eq('is_sous_recette', true)
+    .eq('mode', mode)
+    .single();
+
+  if (existingIngredient) {
+    // Update existing ingredient cost
+    await supabase
+      .from('ingredients')
+      .update({ cout_unitaire: cost })
+      .eq('id', existingIngredient.id);
+  } else {
+    // Create new ingredient linked to this product
+    await supabase
+      .from('ingredients')
+      .insert({
+        nom_ingredient: `[SR] ${product.nom_produit}`,
+        cout_unitaire: cost,
+        unite: product.unite_vente,
+        project_id: projectId,
+        mode,
+        is_sous_recette: true,
+        source_product_id: productId,
+      });
+  }
+}
+
 export function useRecipes(productId?: string) {
   const { currentProject } = useProject();
+  const { mode } = useMode();
   const queryClient = useQueryClient();
 
   // Fetch recipe ingredients for a product (including sub-recipe info)
@@ -123,7 +175,7 @@ export function useRecipes(productId?: string) {
     enabled: !!productId,
   });
 
-  // Add ingredient to recipe
+  // Add ingredient to recipe (auto-creates/updates sub-recipe ingredient)
   const addRecipeIngredient = useMutation({
     mutationFn: async ({ product_id, ingredient_id, quantite_utilisee }: { product_id: string; ingredient_id: string; quantite_utilisee: number }) => {
       const { data, error } = await supabase
@@ -133,11 +185,19 @@ export function useRecipes(productId?: string) {
         .single();
       
       if (error) throw error;
+
+      // Auto-sync the product as a sub-recipe ingredient
+      if (currentProject?.id) {
+        await syncRecipeIngredient(product_id, currentProject.id, mode);
+      }
+
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recipe-ingredients', productId] });
       queryClient.invalidateQueries({ queryKey: ['products-with-costs', currentProject?.id] });
+      queryClient.invalidateQueries({ queryKey: ['sub-recipes', currentProject?.id, mode] });
+      queryClient.invalidateQueries({ queryKey: ['ingredients', currentProject?.id, mode] });
       toast.success('Ingrédient ajouté à la recette');
     },
     onError: (error) => {
@@ -145,19 +205,50 @@ export function useRecipes(productId?: string) {
     },
   });
 
-  // Remove ingredient from recipe
+  // Remove ingredient from recipe (updates sub-recipe cost or removes if no recipe left)
   const removeRecipeIngredient = useMutation({
     mutationFn: async (id: string) => {
+      // Get the recipe to know the product_id before deleting
+      const { data: recipe } = await supabase
+        .from('recipes')
+        .select('product_id')
+        .eq('id', id)
+        .single();
+
       const { error } = await supabase
         .from('recipes')
         .delete()
         .eq('id', id);
       
       if (error) throw error;
+
+      // Check if this product still has any recipe entries
+      if (recipe?.product_id) {
+        const { data: remainingRecipes } = await supabase
+          .from('recipes')
+          .select('id')
+          .eq('product_id', recipe.product_id);
+
+        if (!remainingRecipes || remainingRecipes.length === 0) {
+          // No more recipe entries - remove the sub-recipe ingredient
+          await supabase
+            .from('ingredients')
+            .delete()
+            .eq('source_product_id', recipe.product_id)
+            .eq('is_sous_recette', true);
+        } else {
+          // Still has recipe entries - update the cost
+          if (currentProject?.id) {
+            await syncRecipeIngredient(recipe.product_id, currentProject.id, mode);
+          }
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recipe-ingredients', productId] });
       queryClient.invalidateQueries({ queryKey: ['products-with-costs', currentProject?.id] });
+      queryClient.invalidateQueries({ queryKey: ['sub-recipes', currentProject?.id, mode] });
+      queryClient.invalidateQueries({ queryKey: ['ingredients', currentProject?.id, mode] });
       toast.success('Ingrédient retiré de la recette');
     },
     onError: (error) => {

@@ -515,6 +515,56 @@ export type Database = {
           },
         ]
       }
+      professional_expenses: {
+        Row: {
+          categorie_frais: string
+          created_at: string
+          id: string
+          libelle: string
+          mode: string
+          mois: string
+          montant_ht: number
+          montant_ttc: number | null
+          project_id: string
+          tva_taux: number | null
+          updated_at: string
+        }
+        Insert: {
+          categorie_frais?: string
+          created_at?: string
+          id?: string
+          libelle: string
+          mode?: string
+          mois: string
+          montant_ht?: number
+          montant_ttc?: number | null
+          project_id: string
+          tva_taux?: number | null
+          updated_at?: string
+        }
+        Update: {
+          categorie_frais?: string
+          created_at?: string
+          id?: string
+          libelle?: string
+          mode?: string
+          mois?: string
+          montant_ht?: number
+          montant_ttc?: number | null
+          project_id?: string
+          tva_taux?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "professional_expenses_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_settings: {
         Row: {
           coefficient_cible: number

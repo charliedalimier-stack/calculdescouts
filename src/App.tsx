@@ -22,6 +22,7 @@ import Matrix from "./pages/Matrix";
 import Stocks from "./pages/Stocks";
 import TVA from "./pages/TVA";
 import Global from "./pages/Global";
+import Expenses from "./pages/Expenses";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -45,6 +46,7 @@ const App = () => (
               <Route path="/recipes" element={<Recipes />} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/sales" element={<Sales />} />
+              <Route path="/expenses" element={<Expenses />} />
               <Route path="/cashflow" element={<CashFlow />} />
               <Route path="/analysis" element={<Analysis />} />
               <Route path="/sensitivity" element={<Sensitivity />} />

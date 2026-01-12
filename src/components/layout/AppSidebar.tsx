@@ -16,6 +16,7 @@ import {
   Crosshair,
   ShieldAlert,
   Warehouse,
+  Receipt,
 } from "lucide-react";
 import {
   Sidebar,
@@ -50,6 +51,7 @@ const productionNavItems = [
 const analysisNavItems = [
   { title: "Ventes", icon: TrendingUp, path: "/sales" },
   { title: "Cash-flow", icon: Wallet, path: "/cashflow" },
+  { title: "TVA", icon: Receipt, path: "/tva" },
   { title: "Analyses", icon: BarChart3, path: "/analysis" },
   { title: "Sensibilité", icon: Activity, path: "/sensitivity" },
   { title: "Seuil rentabilité", icon: Crosshair, path: "/breakeven" },

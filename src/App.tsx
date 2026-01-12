@@ -16,6 +16,7 @@ import Sales from "./pages/Sales";
 import CashFlow from "./pages/CashFlow";
 import Analysis from "./pages/Analysis";
 import Sensitivity from "./pages/Sensitivity";
+import Breakeven from "./pages/Breakeven";
 import Matrix from "./pages/Matrix";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -42,6 +43,7 @@ const App = () => (
               <Route path="/cashflow" element={<CashFlow />} />
               <Route path="/analysis" element={<Analysis />} />
               <Route path="/sensitivity" element={<Sensitivity />} />
+              <Route path="/breakeven" element={<Breakeven />} />
               <Route path="/matrix" element={<Matrix />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />

@@ -2,7 +2,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '@/contexts/ProjectContext';
 import { useMode } from '@/contexts/ModeContext';
+import { useProjectSettings } from '@/hooks/useProjectSettings';
 import { toast } from 'sonner';
+import { useMemo } from 'react';
 
 export interface Product {
   id: string;
@@ -24,8 +26,13 @@ export interface ProductWithCosts extends Product {
   cost_variable: number;
   cost_total: number;
   prix_btb: number;
+  prix_btb_ttc: number;
   prix_distributor: number;
+  prix_distributor_ttc: number;
+  prix_btc_ttc: number;
   margin: number;
+  margin_btb: number;
+  margin_distributor: number;
   coefficient: number;
 }
 
@@ -42,6 +49,7 @@ export interface ProductInsert {
 export function useProducts() {
   const { currentProject } = useProject();
   const { mode } = useMode();
+  const { settings } = useProjectSettings();
   const queryClient = useQueryClient();
 
   const { data: products = [], isLoading, error } = useQuery({
@@ -62,9 +70,9 @@ export function useProducts() {
     enabled: !!currentProject?.id,
   });
 
-  // Products with calculated costs
-  const { data: productsWithCosts = [], isLoading: isLoadingCosts } = useQuery({
-    queryKey: ['products-with-costs', currentProject?.id],
+  // Fetch raw product data with costs (without computed prices)
+  const { data: rawProductsData = [], isLoading: isLoadingCosts } = useQuery({
+    queryKey: ['products-raw-costs', currentProject?.id, mode],
     queryFn: async () => {
       if (!currentProject?.id) return [];
 
@@ -73,6 +81,7 @@ export function useProducts() {
         .from('products')
         .select('*, categories(nom_categorie)')
         .eq('project_id', currentProject.id)
+        .eq('mode', mode)
         .order('nom_produit');
       
       if (productsError) throw productsError;
@@ -80,26 +89,29 @@ export function useProducts() {
 
       const productIds = productsData.map(p => p.id);
 
-      // Fetch all recipe costs (including sub-recipe info)
+      // Fetch all recipe costs
       const { data: recipesData } = await supabase
         .from('recipes')
-        .select('product_id, quantite_utilisee, ingredients(cout_unitaire, is_sous_recette, source_product_id)')
-        .in('product_id', productIds);
+        .select('product_id, quantite_utilisee, ingredients(cout_unitaire)')
+        .in('product_id', productIds)
+        .eq('mode', mode);
 
       // Fetch all packaging costs
       const { data: packagingData } = await supabase
         .from('product_packaging')
         .select('product_id, quantite, packaging(cout_unitaire)')
-        .in('product_id', productIds);
+        .in('product_id', productIds)
+        .eq('mode', mode);
 
       // Fetch all variable costs
       const { data: variableData } = await supabase
         .from('product_variable_costs')
         .select('product_id, quantite, variable_costs(cout_unitaire)')
-        .in('product_id', productIds);
+        .in('product_id', productIds)
+        .eq('mode', mode);
 
-      // Calculate costs per product
-      const result: ProductWithCosts[] = productsData.map(product => {
+      // Return raw data with costs only (no computed prices)
+      return productsData.map(product => {
         // Calculate ingredient costs
         const ingredientCost = (recipesData || [])
           .filter(r => r.product_id === product.id)
@@ -124,13 +136,6 @@ export function useProducts() {
             return sum + (Number(v.quantite) * Number(unitCost));
           }, 0);
 
-        const costTotal = ingredientCost + packagingCost + variableCost;
-        const prixBtc = Number(product.prix_btc);
-        const prixBtb = prixBtc * 0.70; // 30% margin for BTB
-        const prixDistributor = prixBtb * 0.85; // 15% margin for distributor
-        const margin = prixBtc > 0 ? ((prixBtc - costTotal) / prixBtc) * 100 : 0;
-        const coefficient = costTotal > 0 ? prixBtc / costTotal : 0;
-
         return {
           ...product,
           mode: product.mode as 'simulation' | 'reel',
@@ -138,18 +143,55 @@ export function useProducts() {
           cost_ingredients: ingredientCost,
           cost_packaging: packagingCost,
           cost_variable: variableCost,
-          cost_total: costTotal,
-          prix_btb: prixBtb,
-          prix_distributor: prixDistributor,
-          margin,
-          coefficient,
+          cost_total: ingredientCost + packagingCost + variableCost,
         };
       });
-
-      return result;
     },
     enabled: !!currentProject?.id,
   });
+
+  // Compute prices reactively based on settings - this will update instantly when settings change
+  const productsWithCosts: ProductWithCosts[] = useMemo(() => {
+    if (!rawProductsData.length) return [];
+    
+    const margeBtb = settings?.marge_btb ?? 30;
+    const margeDistributeur = settings?.marge_distributeur ?? 15;
+    const tvaVente = settings?.tva_vente ?? 5.5;
+
+    return rawProductsData.map(product => {
+      const prixBtc = Number(product.prix_btc);
+      const costTotal = product.cost_total;
+      const productTva = product.tva_taux ?? tvaVente;
+      
+      // Computed prices based on current settings (REACTIVE)
+      const prixBtb = prixBtc * (1 - margeBtb / 100);
+      const prixDistributor = prixBtb * (1 - margeDistributeur / 100);
+      
+      // TTC prices
+      const prixBtcTtc = prixBtc * (1 + productTva / 100);
+      const prixBtbTtc = prixBtb * (1 + productTva / 100);
+      const prixDistributorTtc = prixDistributor * (1 + productTva / 100);
+      
+      // Margins (based on selling price)
+      const margin = prixBtc > 0 ? ((prixBtc - costTotal) / prixBtc) * 100 : 0;
+      const marginBtb = prixBtb > 0 ? ((prixBtb - costTotal) / prixBtb) * 100 : 0;
+      const marginDistributor = prixDistributor > 0 ? ((prixDistributor - costTotal) / prixDistributor) * 100 : 0;
+      const coefficient = costTotal > 0 ? prixBtc / costTotal : 0;
+
+      return {
+        ...product,
+        prix_btb: prixBtb,
+        prix_btb_ttc: prixBtbTtc,
+        prix_distributor: prixDistributor,
+        prix_distributor_ttc: prixDistributorTtc,
+        prix_btc_ttc: prixBtcTtc,
+        margin,
+        margin_btb: marginBtb,
+        margin_distributor: marginDistributor,
+        coefficient,
+      };
+    });
+  }, [rawProductsData, settings?.marge_btb, settings?.marge_distributeur, settings?.tva_vente]);
 
   const addProduct = useMutation({
     mutationFn: async (product: Omit<ProductInsert, 'project_id' | 'mode'>) => {
@@ -166,7 +208,7 @@ export function useProducts() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products', currentProject?.id, mode] });
-      queryClient.invalidateQueries({ queryKey: ['products-with-costs', currentProject?.id, mode] });
+      queryClient.invalidateQueries({ queryKey: ['products-raw-costs', currentProject?.id, mode] });
       toast.success('Produit ajouté avec succès');
     },
     onError: (error) => {
@@ -188,7 +230,7 @@ export function useProducts() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products', currentProject?.id, mode] });
-      queryClient.invalidateQueries({ queryKey: ['products-with-costs', currentProject?.id, mode] });
+      queryClient.invalidateQueries({ queryKey: ['products-raw-costs', currentProject?.id, mode] });
       toast.success('Produit mis à jour');
     },
     onError: (error) => {
@@ -207,7 +249,7 @@ export function useProducts() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products', currentProject?.id, mode] });
-      queryClient.invalidateQueries({ queryKey: ['products-with-costs', currentProject?.id, mode] });
+      queryClient.invalidateQueries({ queryKey: ['products-raw-costs', currentProject?.id, mode] });
       toast.success('Produit supprimé');
     },
     onError: (error) => {

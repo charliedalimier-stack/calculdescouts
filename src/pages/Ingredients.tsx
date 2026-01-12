@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Plus, Search, MoreVertical, Edit, Trash2, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { ingredientSchema, getValidationError } from "@/lib/validations";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,14 +55,18 @@ const Ingredients = () => {
   };
 
   const handleSubmit = () => {
-    if (!formData.nom_ingredient.trim()) return;
-
     const data = {
-      nom_ingredient: formData.nom_ingredient,
+      nom_ingredient: formData.nom_ingredient.trim(),
       cout_unitaire: parseFloat(formData.cout_unitaire) || 0,
-      unite: formData.unite,
-      fournisseur: formData.fournisseur || null,
+      unite: formData.unite.trim(),
+      fournisseur: formData.fournisseur?.trim() || null,
     };
+
+    const error = getValidationError(ingredientSchema, data);
+    if (error) {
+      toast.error(error);
+      return;
+    }
 
     if (editingId) {
       updateIngredient.mutate({ id: editingId, ...data });

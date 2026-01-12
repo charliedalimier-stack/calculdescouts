@@ -44,6 +44,7 @@ import {
   AlertCircle,
   Calendar,
   CalendarRange,
+  Receipt,
 } from "lucide-react";
 import { useGlobalSynthesis } from "@/hooks/useGlobalSynthesis";
 import { useMode } from "@/contexts/ModeContext";
@@ -146,8 +147,10 @@ const Global = () => {
   // Prepare chart data
   const barChartData = [
     { name: 'CA HT', value: synthesis?.ca_ht || 0, fill: 'hsl(var(--primary))' },
-    { name: 'Marge', value: synthesis?.marge_brute || 0, fill: 'hsl(var(--chart-2))' },
-    { name: 'Coûts', value: synthesis?.cout_production || 0, fill: 'hsl(var(--chart-4))' },
+    { name: 'Marge brute', value: synthesis?.marge_brute || 0, fill: 'hsl(var(--chart-2))' },
+    { name: 'Coûts prod.', value: synthesis?.cout_production || 0, fill: 'hsl(var(--chart-4))' },
+    { name: 'Frais pro.', value: synthesis?.frais_professionnels || 0, fill: 'hsl(var(--chart-5))' },
+    { name: 'Résultat net', value: synthesis?.resultat_net || 0, fill: synthesis?.resultat_net && synthesis.resultat_net >= 0 ? 'hsl(var(--chart-1))' : 'hsl(var(--destructive))' },
   ];
 
   const pieChartData = synthesis?.par_categorie.map((cat, i) => ({
@@ -225,20 +228,22 @@ const Global = () => {
       </div>
 
       {/* Alert Banner */}
-      {synthesis && (synthesis.marge_brute < 0 || synthesis.cash_flow < 0) && (
+      {synthesis && (synthesis.alerts.resultat_negatif || synthesis.alerts.cash_flow_negatif || synthesis.alerts.frais_vs_ca > 30) && (
         <div className="mb-6 p-4 rounded-lg border border-destructive/50 bg-destructive/10">
-          <div className="flex items-center gap-2 text-destructive">
+          <div className="flex items-center gap-2 text-destructive flex-wrap">
             <AlertTriangle className="h-5 w-5" />
             <span className="font-semibold">Attention :</span>
-            {synthesis.marge_brute < 0 && <span>Marge négative</span>}
-            {synthesis.marge_brute < 0 && synthesis.cash_flow < 0 && <span> • </span>}
-            {synthesis.cash_flow < 0 && <span>Cash-flow négatif</span>}
+            {synthesis.alerts.resultat_negatif && <span>Résultat net négatif</span>}
+            {synthesis.alerts.resultat_negatif && synthesis.alerts.cash_flow_negatif && <span> • </span>}
+            {synthesis.alerts.cash_flow_negatif && <span>Cash-flow après frais négatif</span>}
+            {(synthesis.alerts.resultat_negatif || synthesis.alerts.cash_flow_negatif) && synthesis.alerts.frais_vs_ca > 30 && <span> • </span>}
+            {synthesis.alerts.frais_vs_ca > 30 && <span>Frais &gt; 30% du CA ({synthesis.alerts.frais_vs_ca.toFixed(1)}%)</span>}
           </div>
         </div>
       )}
 
-      {/* Key Figures Cards */}
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Key Figures Cards - Row 1 */}
+      <div className="mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -284,6 +289,53 @@ const Global = () => {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-chart-5/10">
+                <Receipt className="h-5 w-5 text-chart-5" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm text-muted-foreground">Frais professionnels</p>
+                <p className="text-xl font-bold">{formatCurrency(synthesis?.frais_professionnels || 0)}</p>
+                {synthesis?.alerts.frais_vs_ca > 0 && (
+                  <span className="text-xs text-muted-foreground">{synthesis.alerts.frais_vs_ca.toFixed(1)}% du CA</span>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "flex h-10 w-10 items-center justify-center rounded-lg",
+                (synthesis?.resultat_net || 0) >= 0 ? "bg-primary/10" : "bg-destructive/10"
+              )}>
+                {(synthesis?.resultat_net || 0) >= 0 ? (
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                ) : (
+                  <TrendingDown className="h-5 w-5 text-destructive" />
+                )}
+              </div>
+              <div className="flex-1">
+                <p className="text-sm text-muted-foreground">Résultat net</p>
+                <p className={cn(
+                  "text-xl font-bold",
+                  (synthesis?.resultat_net || 0) >= 0 ? "text-primary" : "text-destructive"
+                )}>
+                  {formatCurrency(synthesis?.resultat_net || 0)}
+                </p>
+                {getStatusBadge(synthesis?.resultat_net || 0, 0)}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Key Figures Cards - Row 2 */}
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent">
                 <Percent className="h-5 w-5 text-accent-foreground" />
               </div>
@@ -310,14 +362,55 @@ const Global = () => {
                 )}
               </div>
               <div className="flex-1">
-                <p className="text-sm text-muted-foreground">Cash-flow</p>
+                <p className="text-sm text-muted-foreground">Cash-flow (prod.)</p>
                 <p className={cn(
                   "text-xl font-bold",
                   (synthesis?.cash_flow || 0) >= 0 ? "text-primary" : "text-destructive"
                 )}>
                   {formatCurrency(synthesis?.cash_flow || 0)}
                 </p>
-                {synthesis?.previous && getVariationBadge(synthesis.cash_flow, synthesis.previous.cash_flow)}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "flex h-10 w-10 items-center justify-center rounded-lg",
+                (synthesis?.cash_flow_apres_frais || 0) >= 0 ? "bg-primary/10" : "bg-destructive/10"
+              )}>
+                {(synthesis?.cash_flow_apres_frais || 0) >= 0 ? (
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                ) : (
+                  <TrendingDown className="h-5 w-5 text-destructive" />
+                )}
+              </div>
+              <div className="flex-1">
+                <p className="text-sm text-muted-foreground">Cash-flow après frais</p>
+                <p className={cn(
+                  "text-xl font-bold",
+                  (synthesis?.cash_flow_apres_frais || 0) >= 0 ? "text-primary" : "text-destructive"
+                )}>
+                  {formatCurrency(synthesis?.cash_flow_apres_frais || 0)}
+                </p>
+                {getStatusBadge(synthesis?.cash_flow_apres_frais || 0, 0)}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent">
+                <Package className="h-5 w-5 text-accent-foreground" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm text-muted-foreground">Produits actifs</p>
+                <p className="text-xl font-bold">{synthesis?.nb_produits_actifs || 0}</p>
+                <span className="text-xs text-muted-foreground">{synthesis?.quantite_vendue || 0} unités vendues</span>
               </div>
             </div>
           </CardContent>
@@ -373,25 +466,56 @@ const Global = () => {
                   <TableCell className="text-right font-medium">{(synthesis?.taux_marge || 0).toFixed(1)}%</TableCell>
                   <TableCell className="text-center">{getStatusBadge(synthesis?.taux_marge || 0, 30)}</TableCell>
                 </TableRow>
+                <TableRow className="border-t-2 border-border">
+                  <TableCell className="text-chart-5 font-medium">Frais professionnels</TableCell>
+                  <TableCell className="text-right text-chart-5">{formatCurrency(synthesis?.frais_professionnels || 0)}</TableCell>
+                  <TableCell className="text-center">
+                    {synthesis?.alerts.frais_vs_ca > 30 ? (
+                      <Badge className="bg-destructive/10 text-destructive border-destructive/20">{synthesis.alerts.frais_vs_ca.toFixed(0)}% du CA</Badge>
+                    ) : synthesis?.alerts.frais_vs_ca > 20 ? (
+                      <Badge className="bg-chart-4/10 text-chart-4 border-chart-4/20">{synthesis.alerts.frais_vs_ca.toFixed(0)}% du CA</Badge>
+                    ) : null}
+                  </TableCell>
+                </TableRow>
+                <TableRow className="bg-accent/50">
+                  <TableCell className="font-bold">Résultat net</TableCell>
+                  <TableCell className={cn(
+                    "text-right font-bold text-lg",
+                    (synthesis?.resultat_net || 0) >= 0 ? "text-primary" : "text-destructive"
+                  )}>
+                    {formatCurrency(synthesis?.resultat_net || 0)}
+                  </TableCell>
+                  <TableCell className="text-center">{getStatusBadge(synthesis?.resultat_net || 0, 0)}</TableCell>
+                </TableRow>
                 <TableRow>
                   <TableCell>TVA collectée</TableCell>
                   <TableCell className="text-right text-muted-foreground">{formatCurrency(synthesis?.tva_collectee || 0)}</TableCell>
                   <TableCell></TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell>TVA déductible</TableCell>
+                  <TableCell>TVA déductible (prod. + frais)</TableCell>
                   <TableCell className="text-right text-muted-foreground">{formatCurrency(synthesis?.tva_deductible || 0)}</TableCell>
                   <TableCell></TableCell>
                 </TableRow>
-                <TableRow className="bg-accent/30">
-                  <TableCell className="font-semibold">Cash-flow période</TableCell>
+                <TableRow>
+                  <TableCell>Cash-flow production</TableCell>
                   <TableCell className={cn(
-                    "text-right font-bold",
-                    (synthesis?.cash_flow || 0) >= 0 ? "text-primary" : "text-destructive"
+                    "text-right",
+                    (synthesis?.cash_flow || 0) >= 0 ? "" : "text-destructive"
                   )}>
                     {formatCurrency(synthesis?.cash_flow || 0)}
                   </TableCell>
-                  <TableCell className="text-center">{getStatusBadge(synthesis?.cash_flow || 0, 0)}</TableCell>
+                  <TableCell></TableCell>
+                </TableRow>
+                <TableRow className="bg-accent/30">
+                  <TableCell className="font-semibold">Cash-flow après frais</TableCell>
+                  <TableCell className={cn(
+                    "text-right font-bold",
+                    (synthesis?.cash_flow_apres_frais || 0) >= 0 ? "text-primary" : "text-destructive"
+                  )}>
+                    {formatCurrency(synthesis?.cash_flow_apres_frais || 0)}
+                  </TableCell>
+                  <TableCell className="text-center">{getStatusBadge(synthesis?.cash_flow_apres_frais || 0, 0)}</TableCell>
                 </TableRow>
               </TableBody>
             </Table>
@@ -545,7 +669,7 @@ const Global = () => {
                   <Tooltip 
                     formatter={(value: number, name: string) => [
                       formatCurrency(value),
-                      name === 'ca_ht' ? 'CA HT' : 'Marge'
+                      name === 'ca_ht' ? 'CA HT' : name === 'marge' ? 'Marge brute' : name === 'frais' ? 'Frais pro.' : 'Résultat net'
                     ]}
                     labelFormatter={(label) => {
                       const [, m] = label.split('-');
@@ -553,7 +677,7 @@ const Global = () => {
                     }}
                     contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
                   />
-                  <Legend formatter={(value) => value === 'ca_ht' ? 'CA HT' : 'Marge'} />
+                  <Legend formatter={(value) => value === 'ca_ht' ? 'CA HT' : value === 'marge' ? 'Marge brute' : value === 'frais' ? 'Frais pro.' : 'Résultat net'} />
                   <Line 
                     type="monotone" 
                     dataKey="ca_ht" 
@@ -567,6 +691,20 @@ const Global = () => {
                     stroke="hsl(var(--chart-2))" 
                     strokeWidth={2}
                     dot={{ fill: 'hsl(var(--chart-2))' }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="frais" 
+                    stroke="hsl(var(--chart-5))" 
+                    strokeWidth={2}
+                    dot={{ fill: 'hsl(var(--chart-5))' }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="resultat_net" 
+                    stroke="hsl(var(--chart-1))" 
+                    strokeWidth={2}
+                    dot={{ fill: 'hsl(var(--chart-1))' }}
                   />
                 </LineChart>
               </ResponsiveContainer>

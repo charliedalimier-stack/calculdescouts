@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Plus, Search, Filter, MoreVertical, Edit, Trash2, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { productSchema, getValidationError } from "@/lib/validations";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,14 +81,18 @@ const Products = () => {
   };
 
   const handleSubmit = () => {
-    if (!formData.nom_produit.trim()) return;
-
     const data = {
-      nom_produit: formData.nom_produit,
+      nom_produit: formData.nom_produit.trim(),
       categorie_id: formData.categorie_id || null,
-      unite_vente: formData.unite_vente,
+      unite_vente: formData.unite_vente.trim(),
       prix_btc: parseFloat(formData.prix_btc) || 0,
     };
+
+    const error = getValidationError(productSchema, data);
+    if (error) {
+      toast.error(error);
+      return;
+    }
 
     if (editingId) {
       updateProduct.mutate({ id: editingId, ...data });

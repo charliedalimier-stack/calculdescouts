@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
 import { format, parse, startOfMonth } from "date-fns";
 import { fr } from "date-fns/locale";
+import { toast } from "sonner";
+import { expenseSchema, getValidationError } from "@/lib/validations";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -158,10 +160,21 @@ const Expenses = () => {
       ? `${selectedMonth}-01`
       : `${selectedYear}-${format(new Date(), "MM")}-01`;
 
-    addExpense.mutate({
-      ...newExpense,
+    const data = {
+      libelle: newExpense.libelle.trim(),
+      montant_ht: newExpense.montant_ht,
+      tva_taux: newExpense.tva_taux,
+      categorie_frais: newExpense.categorie_frais,
       mois: moisDate,
-    });
+    };
+
+    const error = getValidationError(expenseSchema, data);
+    if (error) {
+      toast.error(error);
+      return;
+    }
+
+    addExpense.mutate(data);
     setNewExpense({ libelle: "", categorie_frais: "autres", montant_ht: 0, tva_taux: 20 });
     setIsAddDialogOpen(false);
   };

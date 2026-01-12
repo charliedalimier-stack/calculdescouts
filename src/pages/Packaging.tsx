@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Plus, Search, MoreVertical, Edit, Trash2, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { packagingSchema, getValidationError } from "@/lib/validations";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,14 +81,18 @@ const Packaging = () => {
   };
 
   const handleSubmit = () => {
-    if (!formData.nom.trim()) return;
-
     const data = {
-      nom: formData.nom,
+      nom: formData.nom.trim(),
       cout_unitaire: parseFloat(formData.cout_unitaire) || 0,
-      unite: formData.unite,
+      unite: formData.unite.trim(),
       type_emballage: formData.type_emballage,
     };
+
+    const error = getValidationError(packagingSchema, data);
+    if (error) {
+      toast.error(error);
+      return;
+    }
 
     if (editingId) {
       updatePackaging.mutate({ id: editingId, ...data });

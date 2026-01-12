@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { toast } from "sonner";
+import { cashFlowSchema, getValidationError } from "@/lib/validations";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -75,7 +77,21 @@ const CashFlow = () => {
   });
 
   const handleAddEntry = () => {
-    addCashFlowEntry.mutate(newEntry, {
+    const data = {
+      mois: newEntry.mois,
+      encaissements: newEntry.encaissements,
+      decaissements: newEntry.decaissements,
+      delai_paiement_jours: newEntry.delai_paiement_jours,
+      notes: newEntry.notes || null,
+    };
+
+    const error = getValidationError(cashFlowSchema, data);
+    if (error) {
+      toast.error(error);
+      return;
+    }
+
+    addCashFlowEntry.mutate(data, {
       onSuccess: () => {
         setIsDialogOpen(false);
         setNewEntry({

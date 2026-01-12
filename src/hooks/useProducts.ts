@@ -210,7 +210,8 @@ export function useProducts() {
   return {
     products,
     productsWithCosts,
-    isLoading: isLoading || isLoadingCosts,
+    isLoading,
+    isLoadingWithCosts: isLoadingCosts,
     error,
     addProduct,
     updateProduct,

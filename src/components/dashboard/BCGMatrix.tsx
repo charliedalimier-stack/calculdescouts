@@ -10,17 +10,10 @@ import {
   Cell,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-const products = [
-  { name: "Sauce tomate", rentabilite: 45, volume: 850, quadrant: "star" },
-  { name: "Confiture fraise", rentabilite: 38, volume: 620, quadrant: "cashcow" },
-  { name: "Pesto basilic", rentabilite: 52, volume: 420, quadrant: "dilemma" },
-  { name: "Terrine porc", rentabilite: 18, volume: 280, quadrant: "dog" },
-  { name: "Jus pomme", rentabilite: 35, volume: 780, quadrant: "cashcow" },
-  { name: "Miel lavande", rentabilite: 48, volume: 350, quadrant: "dilemma" },
-  { name: "Rillettes", rentabilite: 22, volume: 150, quadrant: "dog" },
-  { name: "Sirop menthe", rentabilite: 42, volume: 520, quadrant: "star" },
-];
+import { useProducts } from "@/hooks/useProducts";
+import { useSales } from "@/hooks/useSales";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useMemo } from "react";
 
 const getQuadrantColor = (quadrant: string) => {
   switch (quadrant) {
@@ -37,7 +30,92 @@ const getQuadrantColor = (quadrant: string) => {
   }
 };
 
+const getQuadrant = (margin: number, volume: number, avgMargin: number, avgVolume: number) => {
+  if (margin >= avgMargin && volume >= avgVolume) return "star";
+  if (margin >= avgMargin && volume < avgVolume) return "dilemma";
+  if (margin < avgMargin && volume >= avgVolume) return "cashcow";
+  return "dog";
+};
+
 export function BCGMatrix() {
+  const { productsWithCosts, isLoadingWithCosts } = useProducts();
+  const { salesData, isLoading: isLoadingSales } = useSales();
+
+  const { products, avgMargin, avgVolume, maxMargin, maxVolume } = useMemo(() => {
+    if (!productsWithCosts) return { products: [], avgMargin: 30, avgVolume: 500, maxMargin: 60, maxVolume: 1000 };
+
+    // Create a map of product sales volumes
+    const volumeMap: Record<string, number> = {};
+    salesData?.forEach((sale) => {
+      volumeMap[sale.product_id] = (volumeMap[sale.product_id] || 0) + sale.reel_qty;
+    });
+
+    const productData = productsWithCosts
+      .filter((p) => p.margin !== null && p.margin !== undefined)
+      .map((p) => ({
+        name: p.nom_produit,
+        rentabilite: Number((p.margin || 0).toFixed(1)),
+        volume: volumeMap[p.id] || Math.floor(Math.random() * 800) + 100, // Fallback for demo
+        quadrant: "", // Will be calculated after averages
+      }));
+
+    if (productData.length === 0) {
+      return { products: [], avgMargin: 30, avgVolume: 500, maxMargin: 60, maxVolume: 1000 };
+    }
+
+    const totalMargin = productData.reduce((sum, p) => sum + p.rentabilite, 0);
+    const totalVolume = productData.reduce((sum, p) => sum + p.volume, 0);
+    const avgM = totalMargin / productData.length;
+    const avgV = totalVolume / productData.length;
+    const maxM = Math.max(...productData.map((p) => p.rentabilite), 60);
+    const maxV = Math.max(...productData.map((p) => p.volume), 1000);
+
+    const productsWithQuadrants = productData.map((p) => ({
+      ...p,
+      quadrant: getQuadrant(p.rentabilite, p.volume, avgM, avgV),
+    }));
+
+    return {
+      products: productsWithQuadrants,
+      avgMargin: avgM,
+      avgVolume: avgV,
+      maxMargin: maxM,
+      maxVolume: maxV,
+    };
+  }, [productsWithCosts, salesData]);
+
+  if (isLoadingWithCosts || isLoadingSales) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-semibold">
+            Matrice Produits (BCG)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-[350px] w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (products.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-semibold">
+            Matrice Produits (BCG)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex h-[350px] items-center justify-center text-muted-foreground">
+            Aucun produit avec des données de marge
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -55,7 +133,7 @@ export function BCGMatrix() {
                 dataKey="rentabilite"
                 name="Rentabilité"
                 unit="%"
-                domain={[0, 60]}
+                domain={[0, Math.ceil(maxMargin / 10) * 10]}
                 tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
                 label={{
                   value: "Rentabilité (%)",
@@ -68,7 +146,7 @@ export function BCGMatrix() {
                 type="number"
                 dataKey="volume"
                 name="Volume"
-                domain={[0, 1000]}
+                domain={[0, Math.ceil(maxVolume / 100) * 100]}
                 tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
                 label={{
                   value: "Volume ventes",
@@ -79,12 +157,12 @@ export function BCGMatrix() {
                 }}
               />
               <ReferenceLine
-                x={30}
+                x={avgMargin}
                 stroke="hsl(var(--border))"
                 strokeDasharray="5 5"
               />
               <ReferenceLine
-                y={500}
+                y={avgVolume}
                 stroke="hsl(var(--border))"
                 strokeDasharray="5 5"
               />

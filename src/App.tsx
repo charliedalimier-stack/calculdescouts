@@ -21,6 +21,7 @@ import StressTest from "./pages/StressTest";
 import Matrix from "./pages/Matrix";
 import Stocks from "./pages/Stocks";
 import TVA from "./pages/TVA";
+import Global from "./pages/Global";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -36,6 +37,7 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/global" element={<Global />} />
               <Route path="/projects" element={<Projects />} />
               <Route path="/products" element={<Products />} />
               <Route path="/ingredients" element={<Ingredients />} />

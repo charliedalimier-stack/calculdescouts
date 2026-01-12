@@ -17,6 +17,7 @@ import {
   ShieldAlert,
   Warehouse,
   Receipt,
+  Globe,
 } from "lucide-react";
 import {
   Sidebar,
@@ -33,6 +34,7 @@ import {
 
 const mainNavItems = [
   { title: "Tableau de bord", icon: LayoutDashboard, path: "/" },
+  { title: "Synthèse Globale", icon: Globe, path: "/global" },
   { title: "Projets", icon: FolderOpen, path: "/projects" },
 ];
 

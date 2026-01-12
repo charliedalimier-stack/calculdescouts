@@ -419,6 +419,47 @@ export type Database = {
           },
         ]
       }
+      product_prices: {
+        Row: {
+          categorie_prix: string
+          created_at: string
+          id: string
+          mode: string
+          prix_ht: number
+          product_id: string
+          tva_taux: number
+          updated_at: string
+        }
+        Insert: {
+          categorie_prix: string
+          created_at?: string
+          id?: string
+          mode?: string
+          prix_ht?: number
+          product_id: string
+          tva_taux?: number
+          updated_at?: string
+        }
+        Update: {
+          categorie_prix?: string
+          created_at?: string
+          id?: string
+          mode?: string
+          prix_ht?: number
+          product_id?: string
+          tva_taux?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_prices_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_variable_costs: {
         Row: {
           created_at: string
@@ -769,6 +810,7 @@ export type Database = {
       }
       sales_actuals: {
         Row: {
+          categorie_prix: string
           created_at: string
           id: string
           mode: string
@@ -778,6 +820,7 @@ export type Database = {
           quantite_reelle: number
         }
         Insert: {
+          categorie_prix?: string
           created_at?: string
           id?: string
           mode?: string
@@ -787,6 +830,7 @@ export type Database = {
           quantite_reelle?: number
         }
         Update: {
+          categorie_prix?: string
           created_at?: string
           id?: string
           mode?: string
@@ -814,6 +858,7 @@ export type Database = {
       }
       sales_targets: {
         Row: {
+          categorie_prix: string
           created_at: string
           id: string
           mode: string
@@ -823,6 +868,7 @@ export type Database = {
           quantite_objectif: number
         }
         Insert: {
+          categorie_prix?: string
           created_at?: string
           id?: string
           mode?: string
@@ -832,6 +878,7 @@ export type Database = {
           quantite_objectif?: number
         }
         Update: {
+          categorie_prix?: string
           created_at?: string
           id?: string
           mode?: string

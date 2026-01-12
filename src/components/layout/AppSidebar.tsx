@@ -15,6 +15,7 @@ import {
   Activity,
   Crosshair,
   ShieldAlert,
+  Warehouse,
 } from "lucide-react";
 import {
   Sidebar,
@@ -38,6 +39,7 @@ const databaseNavItems = [
   { title: "Produits", icon: Package, path: "/products" },
   { title: "Ingrédients", icon: Apple, path: "/ingredients" },
   { title: "Emballages", icon: Box, path: "/packaging" },
+  { title: "Stocks", icon: Warehouse, path: "/stocks" },
 ];
 
 const productionNavItems = [

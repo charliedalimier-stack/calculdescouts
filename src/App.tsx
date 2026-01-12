@@ -17,6 +17,7 @@ import CashFlow from "./pages/CashFlow";
 import Analysis from "./pages/Analysis";
 import Sensitivity from "./pages/Sensitivity";
 import Breakeven from "./pages/Breakeven";
+import StressTest from "./pages/StressTest";
 import Matrix from "./pages/Matrix";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -44,6 +45,7 @@ const App = () => (
               <Route path="/analysis" element={<Analysis />} />
               <Route path="/sensitivity" element={<Sensitivity />} />
               <Route path="/breakeven" element={<Breakeven />} />
+              <Route path="/stress-test" element={<StressTest />} />
               <Route path="/matrix" element={<Matrix />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />

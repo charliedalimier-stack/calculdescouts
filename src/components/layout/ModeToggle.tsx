@@ -1,6 +1,6 @@
 import { useMode } from '@/contexts/ModeContext';
 import { cn } from '@/lib/utils';
-import { FlaskConical, Factory } from 'lucide-react';
+import { Calculator, Factory } from 'lucide-react';
 import { 
   Tooltip,
   TooltipContent,
@@ -25,12 +25,12 @@ export function ModeToggle() {
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              <FlaskConical className="h-4 w-4" />
-              <span className="hidden sm:inline">Simulation</span>
+              <Calculator className="h-4 w-4" />
+              <span className="hidden sm:inline">Budget</span>
             </button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Mode Simulation : hypothèses et prévisions</p>
+            <p>Mode Budget : prévisions et objectifs</p>
           </TooltipContent>
         </Tooltip>
 

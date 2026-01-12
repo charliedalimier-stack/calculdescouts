@@ -27,6 +27,7 @@ import TVA from "./pages/TVA";
 import Global from "./pages/Global";
 import Expenses from "./pages/Expenses";
 import Settings from "./pages/Settings";
+import BudgetVsReel from "./pages/BudgetVsReel";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -44,6 +45,7 @@ const App = () => (
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 <Route path="/global" element={<ProtectedRoute><Global /></ProtectedRoute>} />
+                <Route path="/budget-vs-reel" element={<ProtectedRoute><BudgetVsReel /></ProtectedRoute>} />
                 <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
                 <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
                 <Route path="/ingredients" element={<ProtectedRoute><Ingredients /></ProtectedRoute>} />

@@ -7,6 +7,7 @@ interface ModeContextType {
   setMode: (mode: AppMode) => void;
   isSimulation: boolean;
   isReel: boolean;
+  isBudget: boolean; // Alias for isSimulation
 }
 
 const ModeContext = createContext<ModeContextType | undefined>(undefined);
@@ -21,6 +22,7 @@ export function ModeProvider({ children }: { children: ReactNode }) {
         setMode,
         isSimulation: mode === 'simulation',
         isReel: mode === 'reel',
+        isBudget: mode === 'simulation', // Budget = simulation
       }}
     >
       {children}

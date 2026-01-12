@@ -21,6 +21,7 @@ import {
   Briefcase,
   LogOut,
   User,
+  Scale,
 } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,7 @@ import {
 const mainNavItems = [
   { title: "Tableau de bord", icon: LayoutDashboard, path: "/" },
   { title: "Synthèse Globale", icon: Globe, path: "/global" },
+  { title: "Budget vs Réel", icon: Scale, path: "/budget-vs-reel" },
   { title: "Projets", icon: FolderOpen, path: "/projects" },
 ];
 

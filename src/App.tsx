@@ -15,6 +15,7 @@ import Pricing from "./pages/Pricing";
 import Sales from "./pages/Sales";
 import CashFlow from "./pages/CashFlow";
 import Analysis from "./pages/Analysis";
+import Sensitivity from "./pages/Sensitivity";
 import Matrix from "./pages/Matrix";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -40,6 +41,7 @@ const App = () => (
               <Route path="/sales" element={<Sales />} />
               <Route path="/cashflow" element={<CashFlow />} />
               <Route path="/analysis" element={<Analysis />} />
+              <Route path="/sensitivity" element={<Sensitivity />} />
               <Route path="/matrix" element={<Matrix />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />

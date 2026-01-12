@@ -1,10 +1,13 @@
 import { useState } from "react";
-import { Plus, ChefHat, Calculator, Clock, Package, Apple } from "lucide-react";
+import { ChefHat, Calculator, Package, Apple, Trash2 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -12,8 +15,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -29,101 +30,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-interface RecipeIngredient {
-  name: string;
-  quantity: number;
-  unit: string;
-  unitCost: number;
-  totalCost: number;
-}
-
-interface RecipePackaging {
-  name: string;
-  quantity: number;
-  unitCost: number;
-  totalCost: number;
-}
-
-interface Recipe {
-  id: string;
-  productName: string;
-  category: string;
-  batchSize: number;
-  batchUnit: string;
-  ingredients: RecipeIngredient[];
-  packaging: RecipePackaging[];
-  productionTime: number; // minutes
-  laborCostPerHour: number;
-  energyCost: number;
-  otherCosts: number;
-  totalIngredientsCost: number;
-  totalPackagingCost: number;
-  totalProductionCost: number;
-  unitCost: number;
-  sellingPrice: number;
-  margin: number;
-}
-
-const mockRecipes: Recipe[] = [
-  {
-    id: "1",
-    productName: "Sauce tomate bio",
-    category: "Sauces",
-    batchSize: 20,
-    batchUnit: "pots",
-    ingredients: [
-      { name: "Tomates pelées bio", quantity: 5, unit: "kg", unitCost: 2.80, totalCost: 14.00 },
-      { name: "Huile d'olive", quantity: 0.5, unit: "L", unitCost: 12.00, totalCost: 6.00 },
-      { name: "Ail bio", quantity: 0.1, unit: "kg", unitCost: 8.00, totalCost: 0.80 },
-      { name: "Basilic frais", quantity: 0.05, unit: "kg", unitCost: 15.00, totalCost: 0.75 },
-    ],
-    packaging: [
-      { name: "Pot verre 250g", quantity: 20, unitCost: 0.45, totalCost: 9.00 },
-      { name: "Couvercle métal", quantity: 20, unitCost: 0.12, totalCost: 2.40 },
-      { name: "Étiquette", quantity: 20, unitCost: 0.08, totalCost: 1.60 },
-    ],
-    productionTime: 90,
-    laborCostPerHour: 15,
-    energyCost: 3.50,
-    otherCosts: 2.00,
-    totalIngredientsCost: 21.55,
-    totalPackagingCost: 13.00,
-    totalProductionCost: 48.55,
-    unitCost: 2.43,
-    sellingPrice: 5.50,
-    margin: 55.8,
-  },
-  {
-    id: "2",
-    productName: "Pesto basilic",
-    category: "Sauces",
-    batchSize: 15,
-    batchUnit: "pots",
-    ingredients: [
-      { name: "Basilic frais", quantity: 0.3, unit: "kg", unitCost: 15.00, totalCost: 4.50 },
-      { name: "Pignons de pin", quantity: 0.15, unit: "kg", unitCost: 45.00, totalCost: 6.75 },
-      { name: "Parmesan AOP", quantity: 0.2, unit: "kg", unitCost: 28.00, totalCost: 5.60 },
-      { name: "Huile d'olive", quantity: 0.4, unit: "L", unitCost: 12.00, totalCost: 4.80 },
-      { name: "Ail bio", quantity: 0.05, unit: "kg", unitCost: 8.00, totalCost: 0.40 },
-    ],
-    packaging: [
-      { name: "Pot verre 180g", quantity: 15, unitCost: 0.38, totalCost: 5.70 },
-      { name: "Couvercle métal", quantity: 15, unitCost: 0.12, totalCost: 1.80 },
-      { name: "Étiquette", quantity: 15, unitCost: 0.08, totalCost: 1.20 },
-    ],
-    productionTime: 60,
-    laborCostPerHour: 15,
-    energyCost: 2.00,
-    otherCosts: 1.00,
-    totalIngredientsCost: 22.05,
-    totalPackagingCost: 8.70,
-    totalProductionCost: 48.75,
-    unitCost: 3.25,
-    sellingPrice: 7.50,
-    margin: 56.7,
-  },
-];
+import { useRecipes } from "@/hooks/useRecipes";
+import { useProducts } from "@/hooks/useProducts";
+import { useIngredients } from "@/hooks/useIngredients";
+import { usePackaging } from "@/hooks/usePackaging";
 
 const getMarginColor = (margin: number) => {
   if (margin >= 50) return "bg-primary";
@@ -132,9 +42,75 @@ const getMarginColor = (margin: number) => {
 };
 
 const Recipes = () => {
-  const [recipes] = useState<Recipe[]>(mockRecipes);
-  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { productsWithCosts, isLoading: isLoadingProducts } = useProducts();
+  const { ingredients } = useIngredients();
+  const { packaging } = usePackaging();
+  
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [isAddRecipeOpen, setIsAddRecipeOpen] = useState(false);
+  const [isAddPackagingOpen, setIsAddPackagingOpen] = useState(false);
+  const [newRecipe, setNewRecipe] = useState({ product_id: '', ingredient_id: '', quantite_utilisee: 0 });
+  const [newPackaging, setNewPackaging] = useState({ product_id: '', packaging_id: '', quantite: 1 });
+
+  // Use the hook for the selected product
+  const { 
+    recipeIngredients,
+    productPackaging: productPackagingItems,
+    isLoading: isLoadingRecipes, 
+    addRecipeIngredient, 
+    removeRecipeIngredient,
+    addProductPackaging,
+    removeProductPackaging,
+  } = useRecipes(selectedProductId || undefined);
+
+  const isLoading = isLoadingProducts;
+  const selectedProduct = productsWithCosts.find(p => p.id === selectedProductId);
+
+  const handleAddRecipe = () => {
+    if (!newRecipe.product_id || !newRecipe.ingredient_id) return;
+    
+    addRecipeIngredient.mutate({
+      product_id: newRecipe.product_id,
+      ingredient_id: newRecipe.ingredient_id,
+      quantite_utilisee: newRecipe.quantite_utilisee,
+    }, {
+      onSuccess: () => {
+        setIsAddRecipeOpen(false);
+        setNewRecipe({ product_id: '', ingredient_id: '', quantite_utilisee: 0 });
+      },
+    });
+  };
+
+  const handleAddPackaging = () => {
+    if (!newPackaging.product_id || !newPackaging.packaging_id) return;
+    
+    addProductPackaging.mutate({
+      product_id: newPackaging.product_id,
+      packaging_id: newPackaging.packaging_id,
+      quantite: newPackaging.quantite,
+    }, {
+      onSuccess: () => {
+        setIsAddPackagingOpen(false);
+        setNewPackaging({ product_id: '', packaging_id: '', quantite: 1 });
+      },
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <AppLayout title="Recettes" subtitle="Gérez vos recettes et calculez les coûts de production">
+        <div className="grid gap-6 lg:grid-cols-2">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-6">
+                <Skeleton className="h-32 w-full" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout
@@ -143,246 +119,336 @@ const Recipes = () => {
     >
       <div className="mb-6 flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {recipes.length} recette{recipes.length > 1 ? "s" : ""} configurée{recipes.length > 1 ? "s" : ""}
+          {productsWithCosts.length} produit{productsWithCosts.length > 1 ? "s" : ""} configuré{productsWithCosts.length > 1 ? "s" : ""}
         </p>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Nouvelle recette
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Créer une nouvelle recette</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-4">
-              <div className="grid grid-cols-2 gap-4">
+        <div className="flex gap-2">
+          <Dialog open={isAddRecipeOpen} onOpenChange={setIsAddRecipeOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Apple className="mr-2 h-4 w-4" />
+                Ajouter ingrédient
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Ajouter un ingrédient à une recette</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
                 <div className="space-y-2">
-                  <Label>Produit associé</Label>
-                  <Select>
+                  <Label>Produit</Label>
+                  <Select 
+                    value={newRecipe.product_id} 
+                    onValueChange={(v) => setNewRecipe({ ...newRecipe, product_id: v })}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Sélectionner un produit" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="sauce">Sauce tomate bio</SelectItem>
-                      <SelectItem value="confiture">Confiture de fraise</SelectItem>
-                      <SelectItem value="pesto">Pesto basilic</SelectItem>
+                      {productsWithCosts.map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.nom_produit}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Taille du lot</Label>
-                  <div className="flex gap-2">
-                    <Input type="number" placeholder="20" className="flex-1" />
-                    <Input placeholder="pots" className="w-24" />
-                  </div>
+                  <Label>Ingrédient</Label>
+                  <Select 
+                    value={newRecipe.ingredient_id} 
+                    onValueChange={(v) => setNewRecipe({ ...newRecipe, ingredient_id: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner un ingrédient" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ingredients.map(i => (
+                        <SelectItem key={i.id} value={i.id}>
+                          {i.nom_ingredient} ({i.cout_unitaire.toFixed(2)} €/{i.unite})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
+                <div className="space-y-2">
+                  <Label>Quantité utilisée</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={newRecipe.quantite_utilisee}
+                    onChange={(e) => setNewRecipe({ ...newRecipe, quantite_utilisee: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
+                <Button className="w-full" onClick={handleAddRecipe} disabled={addRecipeIngredient.isPending}>
+                  {addRecipeIngredient.isPending ? 'Ajout...' : 'Ajouter'}
+                </Button>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Après création, vous pourrez ajouter les ingrédients, emballages et coûts de production.
-              </p>
-              <Button className="w-full" onClick={() => setIsDialogOpen(false)}>
-                Créer la recette
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={isAddPackagingOpen} onOpenChange={setIsAddPackagingOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Package className="mr-2 h-4 w-4" />
+                Ajouter emballage
               </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Ajouter un emballage à un produit</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <Label>Produit</Label>
+                  <Select 
+                    value={newPackaging.product_id} 
+                    onValueChange={(v) => setNewPackaging({ ...newPackaging, product_id: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner un produit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {productsWithCosts.map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.nom_produit}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Emballage</Label>
+                  <Select 
+                    value={newPackaging.packaging_id} 
+                    onValueChange={(v) => setNewPackaging({ ...newPackaging, packaging_id: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner un emballage" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {packaging.map(p => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.nom} ({p.cout_unitaire.toFixed(2)} €/{p.unite})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Quantité</Label>
+                  <Input
+                    type="number"
+                    value={newPackaging.quantite}
+                    onChange={(e) => setNewPackaging({ ...newPackaging, quantite: parseFloat(e.target.value) || 1 })}
+                  />
+                </div>
+                <Button className="w-full" onClick={handleAddPackaging} disabled={addProductPackaging.isPending}>
+                  {addProductPackaging.isPending ? 'Ajout...' : 'Ajouter'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
-      {/* Recipe Cards */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {recipes.map((recipe) => (
-          <Card
-            key={recipe.id}
-            className="cursor-pointer transition-all hover:shadow-md"
-            onClick={() => setSelectedRecipe(recipe)}
-          >
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent">
-                    <ChefHat className="h-5 w-5 text-accent-foreground" />
+      {productsWithCosts.length === 0 ? (
+        <div className="py-12 text-center text-muted-foreground">
+          Aucun produit trouvé. Créez des produits pour configurer leurs recettes.
+        </div>
+      ) : (
+        <>
+          {/* Product Cards */}
+          <div className="grid gap-6 lg:grid-cols-2">
+            {productsWithCosts.map((product) => (
+              <Card
+                key={product.id}
+                className={`cursor-pointer transition-all hover:shadow-md ${selectedProductId === product.id ? 'ring-2 ring-primary' : ''}`}
+                onClick={() => setSelectedProductId(product.id === selectedProductId ? null : product.id)}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent">
+                        <ChefHat className="h-5 w-5 text-accent-foreground" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-base">{product.nom_produit}</CardTitle>
+                        {product.category_name && (
+                          <Badge variant="outline" className="mt-1">{product.category_name}</Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-foreground">{product.margin.toFixed(1)}%</p>
+                      <p className="text-xs text-muted-foreground">marge brute</p>
+                    </div>
                   </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-4">
+                    <div className="mb-2 flex justify-between text-sm">
+                      <span className="text-muted-foreground">Rentabilité</span>
+                      <span className="font-medium">{product.margin.toFixed(1)}%</span>
+                    </div>
+                    <Progress value={Math.min(product.margin, 100)} className={getMarginColor(product.margin)} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="rounded-lg border border-border bg-background p-3">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Calculator className="h-4 w-4" />
+                        <span>Coût total</span>
+                      </div>
+                      <p className="mt-1 text-lg font-semibold">{product.cost_total.toFixed(2)} €</p>
+                    </div>
+                    <div className="rounded-lg border border-border bg-background p-3">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Calculator className="h-4 w-4" />
+                        <span>Prix BTC</span>
+                      </div>
+                      <p className="mt-1 text-lg font-semibold">{product.prix_btc.toFixed(2)} €</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Coef: {product.coefficient.toFixed(2)}x</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Recipe Detail */}
+          {selectedProduct && (
+            <Card className="mt-8">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3">
+                  <ChefHat className="h-5 w-5 text-primary" />
+                  Détail: {selectedProduct.nom_produit}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-6 lg:grid-cols-2">
+                  {/* Ingredients */}
                   <div>
-                    <CardTitle className="text-base">{recipe.productName}</CardTitle>
-                    <Badge variant="outline" className="mt-1">{recipe.category}</Badge>
+                    <h4 className="mb-3 flex items-center gap-2 font-semibold">
+                      <Apple className="h-4 w-4 text-primary" />
+                      Ingrédients ({selectedProduct.cost_ingredients.toFixed(2)} €)
+                    </h4>
+                    {recipeIngredients.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Aucun ingrédient ajouté</p>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Ingrédient</TableHead>
+                            <TableHead className="text-right">Qté</TableHead>
+                            <TableHead className="text-right">Coût</TableHead>
+                            <TableHead></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {recipeIngredients.map((recipe) => (
+                            <TableRow key={recipe.id}>
+                              <TableCell>{recipe.ingredient_name}</TableCell>
+                              <TableCell className="text-right">
+                                {recipe.quantite_utilisee} {recipe.ingredient_unit}
+                              </TableCell>
+                              <TableCell className="text-right">{recipe.line_cost.toFixed(2)} €</TableCell>
+                              <TableCell>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => removeRecipeIngredient.mutate(recipe.id)}
+                                >
+                                  <Trash2 className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </div>
+
+                  {/* Packaging */}
+                  <div>
+                    <h4 className="mb-3 flex items-center gap-2 font-semibold">
+                      <Package className="h-4 w-4 text-primary" />
+                      Emballages ({selectedProduct.cost_packaging.toFixed(2)} €)
+                    </h4>
+                    {productPackagingItems.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Aucun emballage ajouté</p>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Emballage</TableHead>
+                            <TableHead className="text-right">Qté</TableHead>
+                            <TableHead className="text-right">Coût</TableHead>
+                            <TableHead></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {productPackagingItems.map((pp) => (
+                            <TableRow key={pp.id}>
+                              <TableCell>{pp.packaging_name}</TableCell>
+                              <TableCell className="text-right">{pp.quantite}</TableCell>
+                              <TableCell className="text-right">{pp.line_cost.toFixed(2)} €</TableCell>
+                              <TableCell>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => removeProductPackaging.mutate(pp.id)}
+                                >
+                                  <Trash2 className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-foreground">{recipe.margin.toFixed(1)}%</p>
-                  <p className="text-xs text-muted-foreground">marge brute</p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="mb-4">
-                <div className="mb-2 flex justify-between text-sm">
-                  <span className="text-muted-foreground">Rentabilité</span>
-                  <span className="font-medium">{recipe.margin.toFixed(1)}%</span>
-                </div>
-                <Progress value={recipe.margin} className={getMarginColor(recipe.margin)} />
-              </div>
 
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="rounded-lg border border-border bg-background p-3">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Calculator className="h-4 w-4" />
-                    <span>Coût unitaire</span>
+                {/* Cost Summary */}
+                <div className="mt-6 rounded-lg border border-border bg-accent/50 p-4">
+                  <h4 className="mb-4 font-semibold">Récapitulatif des coûts</h4>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Ingrédients</p>
+                      <p className="text-lg font-semibold">{selectedProduct.cost_ingredients.toFixed(2)} €</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Emballages</p>
+                      <p className="text-lg font-semibold">{selectedProduct.cost_packaging.toFixed(2)} €</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Charges variables</p>
+                      <p className="text-lg font-semibold">{selectedProduct.cost_variable.toFixed(2)} €</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Coût total</p>
+                      <p className="text-lg font-semibold">{selectedProduct.cost_total.toFixed(2)} €</p>
+                    </div>
                   </div>
-                  <p className="mt-1 text-lg font-semibold">{recipe.unitCost.toFixed(2)} €</p>
-                </div>
-                <div className="rounded-lg border border-border bg-background p-3">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Clock className="h-4 w-4" />
-                    <span>Temps prod.</span>
+
+                  <div className="mt-4 grid gap-4 border-t border-border pt-4 sm:grid-cols-3">
+                    <div className="rounded-lg bg-background p-3">
+                      <p className="text-sm text-muted-foreground">Prix BTC</p>
+                      <p className="text-xl font-bold">{selectedProduct.prix_btc.toFixed(2)} €</p>
+                    </div>
+                    <div className="rounded-lg bg-background p-3">
+                      <p className="text-sm text-muted-foreground">Coefficient</p>
+                      <p className="text-xl font-bold">{selectedProduct.coefficient.toFixed(2)}x</p>
+                    </div>
+                    <div className="rounded-lg bg-primary/10 p-3">
+                      <p className="text-sm text-muted-foreground">Marge brute</p>
+                      <p className="text-xl font-bold text-primary">{selectedProduct.margin.toFixed(1)}%</p>
+                    </div>
                   </div>
-                  <p className="mt-1 text-lg font-semibold">{recipe.productionTime} min</p>
                 </div>
-              </div>
-
-              <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Apple className="h-3 w-3" />
-                  {recipe.ingredients.length} ingrédients
-                </span>
-                <span className="flex items-center gap-1">
-                  <Package className="h-3 w-3" />
-                  {recipe.packaging.length} emballages
-                </span>
-                <span>Lot: {recipe.batchSize} {recipe.batchUnit}</span>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Recipe Detail Dialog */}
-      {selectedRecipe && (
-        <Dialog open={!!selectedRecipe} onOpenChange={() => setSelectedRecipe(null)}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-3">
-                <ChefHat className="h-5 w-5 text-primary" />
-                {selectedRecipe.productName}
-              </DialogTitle>
-            </DialogHeader>
-
-            <div className="grid gap-6 pt-4 lg:grid-cols-2">
-              {/* Ingredients */}
-              <div>
-                <h4 className="mb-3 flex items-center gap-2 font-semibold">
-                  <Apple className="h-4 w-4 text-primary" />
-                  Ingrédients
-                </h4>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Ingrédient</TableHead>
-                      <TableHead className="text-right">Qté</TableHead>
-                      <TableHead className="text-right">Coût</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {selectedRecipe.ingredients.map((ing, index) => (
-                      <TableRow key={index}>
-                        <TableCell>{ing.name}</TableCell>
-                        <TableCell className="text-right">
-                          {ing.quantity} {ing.unit}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {ing.totalCost.toFixed(2)} €
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    <TableRow className="font-medium">
-                      <TableCell colSpan={2}>Total ingrédients</TableCell>
-                      <TableCell className="text-right">
-                        {selectedRecipe.totalIngredientsCost.toFixed(2)} €
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </div>
-
-              {/* Packaging */}
-              <div>
-                <h4 className="mb-3 flex items-center gap-2 font-semibold">
-                  <Package className="h-4 w-4 text-primary" />
-                  Emballages
-                </h4>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Emballage</TableHead>
-                      <TableHead className="text-right">Qté</TableHead>
-                      <TableHead className="text-right">Coût</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {selectedRecipe.packaging.map((pack, index) => (
-                      <TableRow key={index}>
-                        <TableCell>{pack.name}</TableCell>
-                        <TableCell className="text-right">{pack.quantity}</TableCell>
-                        <TableCell className="text-right">
-                          {pack.totalCost.toFixed(2)} €
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    <TableRow className="font-medium">
-                      <TableCell colSpan={2}>Total emballages</TableCell>
-                      <TableCell className="text-right">
-                        {selectedRecipe.totalPackagingCost.toFixed(2)} €
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-
-            {/* Cost Summary */}
-            <div className="mt-6 rounded-lg border border-border bg-accent/50 p-4">
-              <h4 className="mb-4 font-semibold">Récapitulatif des coûts (lot de {selectedRecipe.batchSize} {selectedRecipe.batchUnit})</h4>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Matières premières</p>
-                  <p className="text-lg font-semibold">{selectedRecipe.totalIngredientsCost.toFixed(2)} €</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Emballages</p>
-                  <p className="text-lg font-semibold">{selectedRecipe.totalPackagingCost.toFixed(2)} €</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Main d'œuvre</p>
-                  <p className="text-lg font-semibold">
-                    {((selectedRecipe.productionTime / 60) * selectedRecipe.laborCostPerHour).toFixed(2)} €
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Autres coûts</p>
-                  <p className="text-lg font-semibold">
-                    {(selectedRecipe.energyCost + selectedRecipe.otherCosts).toFixed(2)} €
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-4 grid gap-4 border-t border-border pt-4 sm:grid-cols-3">
-                <div className="rounded-lg bg-background p-3">
-                  <p className="text-sm text-muted-foreground">Coût total lot</p>
-                  <p className="text-xl font-bold">{selectedRecipe.totalProductionCost.toFixed(2)} €</p>
-                </div>
-                <div className="rounded-lg bg-background p-3">
-                  <p className="text-sm text-muted-foreground">Coût unitaire</p>
-                  <p className="text-xl font-bold">{selectedRecipe.unitCost.toFixed(2)} €</p>
-                </div>
-                <div className="rounded-lg bg-primary/10 p-3">
-                  <p className="text-sm text-muted-foreground">Marge brute</p>
-                  <p className="text-xl font-bold text-primary">{selectedRecipe.margin.toFixed(1)}%</p>
-                </div>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
     </AppLayout>
   );

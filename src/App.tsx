@@ -20,6 +20,7 @@ import Breakeven from "./pages/Breakeven";
 import StressTest from "./pages/StressTest";
 import Matrix from "./pages/Matrix";
 import Stocks from "./pages/Stocks";
+import TVA from "./pages/TVA";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -49,6 +50,7 @@ const App = () => (
               <Route path="/stress-test" element={<StressTest />} />
               <Route path="/matrix" element={<Matrix />} />
               <Route path="/stocks" element={<Stocks />} />
+              <Route path="/tva" element={<TVA />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

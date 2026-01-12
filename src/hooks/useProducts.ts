@@ -80,10 +80,10 @@ export function useProducts() {
 
       const productIds = productsData.map(p => p.id);
 
-      // Fetch all recipe costs
+      // Fetch all recipe costs (including sub-recipe info)
       const { data: recipesData } = await supabase
         .from('recipes')
-        .select('product_id, quantite_utilisee, ingredients(cout_unitaire)')
+        .select('product_id, quantite_utilisee, ingredients(cout_unitaire, is_sous_recette, source_product_id)')
         .in('product_id', productIds);
 
       // Fetch all packaging costs

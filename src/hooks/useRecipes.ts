@@ -12,6 +12,8 @@ export interface RecipeIngredient {
   ingredient_unit: string;
   ingredient_cost: number;
   line_cost: number;
+  is_sub_recipe: boolean;
+  source_product_id: string | null;
 }
 
 export interface ProductPackagingItem {
@@ -39,7 +41,7 @@ export function useRecipes(productId?: string) {
   const { currentProject } = useProject();
   const queryClient = useQueryClient();
 
-  // Fetch recipe ingredients for a product
+  // Fetch recipe ingredients for a product (including sub-recipe info)
   const { data: recipeIngredients = [], isLoading: isLoadingIngredients } = useQuery({
     queryKey: ['recipe-ingredients', productId],
     queryFn: async () => {
@@ -47,7 +49,7 @@ export function useRecipes(productId?: string) {
       
       const { data, error } = await supabase
         .from('recipes')
-        .select('*, ingredients(nom_ingredient, unite, cout_unitaire)')
+        .select('*, ingredients(nom_ingredient, unite, cout_unitaire, is_sous_recette, source_product_id)')
         .eq('product_id', productId);
       
       if (error) throw error;
@@ -61,6 +63,8 @@ export function useRecipes(productId?: string) {
         ingredient_unit: (r.ingredients as any)?.unite || '',
         ingredient_cost: Number((r.ingredients as any)?.cout_unitaire || 0),
         line_cost: Number(r.quantite_utilisee) * Number((r.ingredients as any)?.cout_unitaire || 0),
+        is_sub_recipe: (r.ingredients as any)?.is_sous_recette || false,
+        source_product_id: (r.ingredients as any)?.source_product_id || null,
       })) as RecipeIngredient[];
     },
     enabled: !!productId,

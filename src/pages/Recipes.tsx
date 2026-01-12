@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChefHat, Calculator, Package, Apple, Trash2 } from "lucide-react";
+import { ChefHat, Calculator, Package, Apple, Trash2, Link2 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +35,7 @@ import { useRecipes } from "@/hooks/useRecipes";
 import { useProducts } from "@/hooks/useProducts";
 import { useIngredients } from "@/hooks/useIngredients";
 import { usePackaging } from "@/hooks/usePackaging";
+import { SubRecipeManager } from "@/components/recipes/SubRecipeManager";
 
 const getMarginColor = (margin: number) => {
   if (margin >= 50) return "bg-primary";
@@ -114,8 +116,8 @@ const Recipes = () => {
 
   return (
     <AppLayout
-      title="Recettes"
-      subtitle="Gérez vos recettes et calculez les coûts de production"
+      title="Recettes & Sous-recettes"
+      subtitle="Gérez vos recettes, sous-recettes et calculez les coûts de production"
     >
       <div className="mb-6 flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
@@ -346,7 +348,17 @@ const Recipes = () => {
                         <TableBody>
                           {recipeIngredients.map((recipe) => (
                             <TableRow key={recipe.id}>
-                              <TableCell>{recipe.ingredient_name}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  {recipe.is_sub_recipe && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      <Link2 className="mr-1 h-3 w-3" />
+                                      SR
+                                    </Badge>
+                                  )}
+                                  {recipe.ingredient_name}
+                                </div>
+                              </TableCell>
                               <TableCell className="text-right">
                                 {recipe.quantite_utilisee} {recipe.ingredient_unit}
                               </TableCell>
@@ -448,6 +460,11 @@ const Recipes = () => {
               </CardContent>
             </Card>
           )}
+
+          {/* Sub-recipes Manager */}
+          <div className="mt-8">
+            <SubRecipeManager />
+          </div>
         </>
       )}
     </AppLayout>

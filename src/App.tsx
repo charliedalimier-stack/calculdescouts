@@ -3,8 +3,11 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/contexts/AuthContext";
 import { ProjectProvider } from "@/contexts/ProjectContext";
 import { ModeProvider } from "@/contexts/ModeContext";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import Auth from "./pages/Auth";
 import Index from "./pages/Index";
 import Projects from "./pages/Projects";
 import Products from "./pages/Products";
@@ -30,38 +33,41 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ProjectProvider>
-      <ModeProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/global" element={<Global />} />
-              <Route path="/projects" element={<Projects />} />
-              <Route path="/products" element={<Products />} />
-              <Route path="/ingredients" element={<Ingredients />} />
-              <Route path="/packaging" element={<Packaging />} />
-              <Route path="/recipes" element={<Recipes />} />
-              <Route path="/pricing" element={<Pricing />} />
-              <Route path="/sales" element={<Sales />} />
-              <Route path="/expenses" element={<Expenses />} />
-              <Route path="/cashflow" element={<CashFlow />} />
-              <Route path="/analysis" element={<Analysis />} />
-              <Route path="/sensitivity" element={<Sensitivity />} />
-              <Route path="/breakeven" element={<Breakeven />} />
-              <Route path="/stress-test" element={<StressTest />} />
-              <Route path="/matrix" element={<Matrix />} />
-              <Route path="/stocks" element={<Stocks />} />
-              <Route path="/tva" element={<TVA />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </ModeProvider>
-    </ProjectProvider>
+    <AuthProvider>
+      <ProjectProvider>
+        <ModeProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+                <Route path="/global" element={<ProtectedRoute><Global /></ProtectedRoute>} />
+                <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
+                <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
+                <Route path="/ingredients" element={<ProtectedRoute><Ingredients /></ProtectedRoute>} />
+                <Route path="/packaging" element={<ProtectedRoute><Packaging /></ProtectedRoute>} />
+                <Route path="/recipes" element={<ProtectedRoute><Recipes /></ProtectedRoute>} />
+                <Route path="/pricing" element={<ProtectedRoute><Pricing /></ProtectedRoute>} />
+                <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
+                <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
+                <Route path="/cashflow" element={<ProtectedRoute><CashFlow /></ProtectedRoute>} />
+                <Route path="/analysis" element={<ProtectedRoute><Analysis /></ProtectedRoute>} />
+                <Route path="/sensitivity" element={<ProtectedRoute><Sensitivity /></ProtectedRoute>} />
+                <Route path="/breakeven" element={<ProtectedRoute><Breakeven /></ProtectedRoute>} />
+                <Route path="/stress-test" element={<ProtectedRoute><StressTest /></ProtectedRoute>} />
+                <Route path="/matrix" element={<ProtectedRoute><Matrix /></ProtectedRoute>} />
+                <Route path="/stocks" element={<ProtectedRoute><Stocks /></ProtectedRoute>} />
+                <Route path="/tva" element={<ProtectedRoute><TVA /></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </TooltipProvider>
+        </ModeProvider>
+      </ProjectProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 

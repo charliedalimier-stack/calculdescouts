@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Package,
@@ -19,7 +19,12 @@ import {
   Receipt,
   Globe,
   Briefcase,
+  LogOut,
+  User,
 } from "lucide-react";
+import { useAuthContext } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import {
   Sidebar,
   SidebarContent,
@@ -65,6 +70,17 @@ const analysisNavItems = [
 
 export function AppSidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, signOut } = useAuthContext();
+
+  const handleSignOut = async () => {
+    const { error } = await signOut();
+    if (error) {
+      toast.error("Erreur lors de la déconnexion");
+    } else {
+      navigate("/auth");
+    }
+  };
 
   const NavGroup = ({
     label,
@@ -120,7 +136,13 @@ export function AppSidebar() {
         <NavGroup label="Production" items={productionNavItems} />
         <NavGroup label="Analyses" items={analysisNavItems} />
       </SidebarContent>
-      <SidebarFooter className="border-t border-sidebar-border p-4">
+      <SidebarFooter className="border-t border-sidebar-border p-4 space-y-2">
+        {user && (
+          <div className="flex items-center gap-2 px-2 py-1.5 text-sm text-muted-foreground">
+            <User className="h-4 w-4" />
+            <span className="truncate">{user.email}</span>
+          </div>
+        )}
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
@@ -128,6 +150,12 @@ export function AppSidebar() {
                 <Settings className="h-4 w-4" />
                 <span>Paramètres</span>
               </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={handleSignOut} className="text-destructive hover:text-destructive">
+              <LogOut className="h-4 w-4" />
+              <span>Déconnexion</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

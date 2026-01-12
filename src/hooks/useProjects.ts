@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '@/contexts/ProjectContext';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
 export interface ProjectInsert {
@@ -10,13 +11,19 @@ export interface ProjectInsert {
 
 export function useProjects() {
   const { projects, isLoading, refetchProjects, setCurrentProject } = useProject();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const addProject = useMutation({
     mutationFn: async (project: ProjectInsert) => {
+      if (!user) throw new Error('Utilisateur non connecté');
+      
       const { data, error } = await supabase
         .from('projects')
-        .insert(project)
+        .insert({
+          ...project,
+          owner_user_id: user.id,
+        })
         .select()
         .single();
       
@@ -77,15 +84,18 @@ export function useProjects() {
 
   const duplicateProject = useMutation({
     mutationFn: async (sourceId: string) => {
+      if (!user) throw new Error('Utilisateur non connecté');
+      
       const source = projects.find(p => p.id === sourceId);
       if (!source) throw new Error('Projet source non trouvé');
 
-      // Create new project
+      // Create new project with owner
       const { data: newProject, error: projectError } = await supabase
         .from('projects')
         .insert({
           nom_projet: `${source.nom_projet} (copie)`,
           description: source.description,
+          owner_user_id: user.id,
         })
         .select()
         .single();
@@ -107,7 +117,7 @@ export function useProjects() {
       // Copy ingredients
       const { data: ingredients } = await supabase
         .from('ingredients')
-        .select('nom_ingredient, cout_unitaire, unite, fournisseur')
+        .select('nom_ingredient, cout_unitaire, unite, fournisseur, tva_taux')
         .eq('project_id', sourceId);
 
       if (ingredients && ingredients.length > 0) {
@@ -119,13 +129,28 @@ export function useProjects() {
       // Copy packaging
       const { data: packaging } = await supabase
         .from('packaging')
-        .select('nom, cout_unitaire, unite, type_emballage')
+        .select('nom, cout_unitaire, unite, type_emballage, tva_taux')
         .eq('project_id', sourceId);
 
       if (packaging && packaging.length > 0) {
         await supabase.from('packaging').insert(
           packaging.map(p => ({ ...p, project_id: newProject.id }))
         );
+      }
+
+      // Copy project settings
+      const { data: settings } = await supabase
+        .from('project_settings')
+        .select('*')
+        .eq('project_id', sourceId)
+        .single();
+
+      if (settings) {
+        const { id, project_id, created_at, updated_at, ...settingsData } = settings;
+        await supabase.from('project_settings').insert({
+          ...settingsData,
+          project_id: newProject.id,
+        });
       }
 
       return newProject;

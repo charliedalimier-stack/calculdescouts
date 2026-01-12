@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '@/contexts/ProjectContext';
+import { useMode } from '@/contexts/ModeContext';
 import { toast } from 'sonner';
 
 export interface Ingredient {
@@ -10,6 +11,10 @@ export interface Ingredient {
   unite: string;
   fournisseur: string | null;
   project_id: string;
+  mode: 'simulation' | 'reel';
+  tva_taux: number | null;
+  is_sous_recette: boolean;
+  source_product_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -20,14 +25,19 @@ export interface IngredientInsert {
   unite: string;
   fournisseur?: string | null;
   project_id: string;
+  mode?: 'simulation' | 'reel';
+  tva_taux?: number | null;
+  is_sous_recette?: boolean;
+  source_product_id?: string | null;
 }
 
 export function useIngredients() {
   const { currentProject } = useProject();
+  const { mode } = useMode();
   const queryClient = useQueryClient();
 
   const { data: ingredients = [], isLoading, error } = useQuery({
-    queryKey: ['ingredients', currentProject?.id],
+    queryKey: ['ingredients', currentProject?.id, mode],
     queryFn: async () => {
       if (!currentProject?.id) return [];
       
@@ -35,21 +45,22 @@ export function useIngredients() {
         .from('ingredients')
         .select('*')
         .eq('project_id', currentProject.id)
+        .eq('mode', mode)
         .order('nom_ingredient');
       
       if (error) throw error;
-      return data as Ingredient[];
+      return data.map(d => ({ ...d, mode: d.mode as 'simulation' | 'reel' })) as Ingredient[];
     },
     enabled: !!currentProject?.id,
   });
 
   const addIngredient = useMutation({
-    mutationFn: async (ingredient: Omit<IngredientInsert, 'project_id'>) => {
+    mutationFn: async (ingredient: Omit<IngredientInsert, 'project_id' | 'mode'>) => {
       if (!currentProject?.id) throw new Error('Aucun projet sélectionné');
       
       const { data, error } = await supabase
         .from('ingredients')
-        .insert({ ...ingredient, project_id: currentProject.id })
+        .insert({ ...ingredient, project_id: currentProject.id, mode })
         .select()
         .single();
       
@@ -57,7 +68,7 @@ export function useIngredients() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ingredients', currentProject?.id] });
+      queryClient.invalidateQueries({ queryKey: ['ingredients', currentProject?.id, mode] });
       toast.success('Ingrédient ajouté avec succès');
     },
     onError: (error) => {
@@ -78,7 +89,7 @@ export function useIngredients() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ingredients', currentProject?.id] });
+      queryClient.invalidateQueries({ queryKey: ['ingredients', currentProject?.id, mode] });
       queryClient.invalidateQueries({ queryKey: ['products-with-costs'] });
       toast.success('Ingrédient mis à jour');
     },
@@ -108,7 +119,7 @@ export function useIngredients() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ingredients', currentProject?.id] });
+      queryClient.invalidateQueries({ queryKey: ['ingredients', currentProject?.id, mode] });
       toast.success('Ingrédient supprimé');
     },
     onError: (error) => {

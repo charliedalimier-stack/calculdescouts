@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '@/contexts/ProjectContext';
+import { useMode } from '@/contexts/ModeContext';
 import { toast } from 'sonner';
 
 export interface Product {
@@ -10,6 +11,8 @@ export interface Product {
   unite_vente: string;
   prix_btc: number;
   project_id: string;
+  mode: 'simulation' | 'reel';
+  tva_taux: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -32,14 +35,17 @@ export interface ProductInsert {
   unite_vente: string;
   prix_btc: number;
   project_id: string;
+  mode?: 'simulation' | 'reel';
+  tva_taux?: number | null;
 }
 
 export function useProducts() {
   const { currentProject } = useProject();
+  const { mode } = useMode();
   const queryClient = useQueryClient();
 
   const { data: products = [], isLoading, error } = useQuery({
-    queryKey: ['products', currentProject?.id],
+    queryKey: ['products', currentProject?.id, mode],
     queryFn: async () => {
       if (!currentProject?.id) return [];
       
@@ -47,6 +53,7 @@ export function useProducts() {
         .from('products')
         .select('*, categories(nom_categorie)')
         .eq('project_id', currentProject.id)
+        .eq('mode', mode)
         .order('nom_produit');
       
       if (error) throw error;
@@ -126,6 +133,7 @@ export function useProducts() {
 
         return {
           ...product,
+          mode: product.mode as 'simulation' | 'reel',
           category_name: (product.categories as any)?.nom_categorie || null,
           cost_ingredients: ingredientCost,
           cost_packaging: packagingCost,
@@ -144,12 +152,12 @@ export function useProducts() {
   });
 
   const addProduct = useMutation({
-    mutationFn: async (product: Omit<ProductInsert, 'project_id'>) => {
+    mutationFn: async (product: Omit<ProductInsert, 'project_id' | 'mode'>) => {
       if (!currentProject?.id) throw new Error('Aucun projet sélectionné');
       
       const { data, error } = await supabase
         .from('products')
-        .insert({ ...product, project_id: currentProject.id })
+        .insert({ ...product, project_id: currentProject.id, mode })
         .select()
         .single();
       
@@ -157,8 +165,8 @@ export function useProducts() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products', currentProject?.id] });
-      queryClient.invalidateQueries({ queryKey: ['products-with-costs', currentProject?.id] });
+      queryClient.invalidateQueries({ queryKey: ['products', currentProject?.id, mode] });
+      queryClient.invalidateQueries({ queryKey: ['products-with-costs', currentProject?.id, mode] });
       toast.success('Produit ajouté avec succès');
     },
     onError: (error) => {
@@ -179,8 +187,8 @@ export function useProducts() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products', currentProject?.id] });
-      queryClient.invalidateQueries({ queryKey: ['products-with-costs', currentProject?.id] });
+      queryClient.invalidateQueries({ queryKey: ['products', currentProject?.id, mode] });
+      queryClient.invalidateQueries({ queryKey: ['products-with-costs', currentProject?.id, mode] });
       toast.success('Produit mis à jour');
     },
     onError: (error) => {
@@ -198,8 +206,8 @@ export function useProducts() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products', currentProject?.id] });
-      queryClient.invalidateQueries({ queryKey: ['products-with-costs', currentProject?.id] });
+      queryClient.invalidateQueries({ queryKey: ['products', currentProject?.id, mode] });
+      queryClient.invalidateQueries({ queryKey: ['products-with-costs', currentProject?.id, mode] });
       toast.success('Produit supprimé');
     },
     onError: (error) => {

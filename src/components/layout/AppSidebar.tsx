@@ -14,6 +14,7 @@ import {
   Settings,
   Activity,
   Crosshair,
+  ShieldAlert,
 } from "lucide-react";
 import {
   Sidebar,
@@ -50,6 +51,7 @@ const analysisNavItems = [
   { title: "Analyses", icon: BarChart3, path: "/analysis" },
   { title: "Sensibilité", icon: Activity, path: "/sensitivity" },
   { title: "Seuil rentabilité", icon: Crosshair, path: "/breakeven" },
+  { title: "Stress Test", icon: ShieldAlert, path: "/stress-test" },
   { title: "Matrice BCG", icon: Target, path: "/matrix" },
 ];
 

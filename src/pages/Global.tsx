@@ -181,12 +181,12 @@ const Global = () => {
   return (
     <AppLayout
       title="Synthèse Globale"
-      subtitle={`Vue consolidée - Mode ${mode === 'simulation' ? 'Simulation' : 'Réel'}`}
+      subtitle={`Vue consolidée - Mode ${mode === 'simulation' ? 'Budget' : 'Réel'}`}
     >
       {/* Period Selectors */}
       <div className="mb-6 flex flex-wrap items-center gap-4">
         <Badge variant="outline" className="text-sm px-3 py-1">
-          {mode === 'simulation' ? '🔬 Simulation' : '📊 Réel'}
+          {mode === 'simulation' ? '📊 Budget' : '✅ Réel'}
         </Badge>
 
         <Tabs value={periodType} onValueChange={(v) => setPeriodType(v as PeriodType)}>

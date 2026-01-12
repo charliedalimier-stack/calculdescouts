@@ -56,11 +56,14 @@ const productionNavItems = [
   { title: "Tarification", icon: Calculator, path: "/pricing" },
 ];
 
-const analysisNavItems = [
+const financialAnalysisNavItems = [
   { title: "Ventes", icon: TrendingUp, path: "/sales" },
   { title: "Frais professionnels", icon: Briefcase, path: "/expenses" },
   { title: "Cash-flow", icon: Wallet, path: "/cashflow" },
   { title: "TVA", icon: Receipt, path: "/tva" },
+];
+
+const productAnalysisNavItems = [
   { title: "Analyses", icon: BarChart3, path: "/analysis" },
   { title: "Sensibilité", icon: Activity, path: "/sensitivity" },
   { title: "Seuil rentabilité", icon: Crosshair, path: "/breakeven" },
@@ -134,7 +137,8 @@ export function AppSidebar() {
         <NavGroup label="Navigation" items={mainNavItems} />
         <NavGroup label="Base de données" items={databaseNavItems} />
         <NavGroup label="Production" items={productionNavItems} />
-        <NavGroup label="Analyses" items={analysisNavItems} />
+        <NavGroup label="Analyse financière" items={financialAnalysisNavItems} />
+        <NavGroup label="Analyse produits" items={productAnalysisNavItems} />
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border p-4 space-y-2">
         {user && (

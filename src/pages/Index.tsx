@@ -6,6 +6,7 @@ import {
   ChefHat,
   Receipt,
   AlertTriangle,
+  Calendar,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { KPICard } from "@/components/dashboard/KPICard";
@@ -15,95 +16,152 @@ import { SalesChart } from "@/components/dashboard/SalesChart";
 import { BCGMatrix } from "@/components/dashboard/BCGMatrix";
 import { ProductAlerts } from "@/components/dashboard/ProductAlerts";
 import { useProducts } from "@/hooks/useProducts";
-import { useSales } from "@/hooks/useSales";
-import { useCashFlow } from "@/hooks/useCashFlow";
-import { useExpenses } from "@/hooks/useExpenses";
+import { useGlobalSynthesis } from "@/hooks/useGlobalSynthesis";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
-import { useMemo } from "react";
+import { useState, useMemo } from "react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+const MONTHS = [
+  { value: 1, label: "Janvier" },
+  { value: 2, label: "Février" },
+  { value: 3, label: "Mars" },
+  { value: 4, label: "Avril" },
+  { value: 5, label: "Mai" },
+  { value: 6, label: "Juin" },
+  { value: 7, label: "Juillet" },
+  { value: 8, label: "Août" },
+  { value: 9, label: "Septembre" },
+  { value: 10, label: "Octobre" },
+  { value: 11, label: "Novembre" },
+  { value: 12, label: "Décembre" },
+];
 
 const Index = () => {
-  const { productsWithCosts, products, isLoadingWithCosts } = useProducts();
-  const { salesData, totals, isLoading: isLoadingSales } = useSales();
-  const { currentMonth, isLoading: isLoadingCashFlow } = useCashFlow();
-  const { summary: expensesSummary, isLoading: isLoadingExpenses } = useExpenses();
+  const currentDate = new Date();
+  const [periodType, setPeriodType] = useState<'month' | 'year'>('month');
+  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
 
-  const kpiData = useMemo(() => {
-    const totalCA = totals?.reel_ca || 0;
-    const previousCA = totals?.objectif_ca || 0;
-    const caChange = previousCA > 0 ? ((totalCA - previousCA) / previousCA) * 100 : 0;
+  const { products, isLoadingWithCosts } = useProducts();
+  const { data: synthesisData, isLoading: isLoadingSynthesis } = useGlobalSynthesis({
+    periodType,
+    year: selectedYear,
+    month: periodType === 'month' ? selectedMonth : undefined,
+  });
 
-    // Calculate weighted average margin
-    const weightedMargin = productsWithCosts?.reduce((acc, p) => {
-      const productSales = salesData?.find((s) => s.product_id === p.id);
-      const productCA = productSales?.reel_ca || 0;
-      return acc + (p.margin * productCA);
-    }, 0) || 0;
-    const avgMargin = totalCA > 0 ? weightedMargin / totalCA : 0;
+  // Default synthesis if no data
+  const synthesis = useMemo(() => synthesisData || {
+    ca_ht: 0,
+    ca_ttc: 0,
+    cout_production: 0,
+    marge_brute: 0,
+    taux_marge: 0,
+    resultat_net: 0,
+    cash_flow: 0,
+    cash_flow_apres_frais: 0,
+    frais_professionnels: 0,
+    quantite_vendue: 0,
+    par_categorie: [],
+    previous: null,
+    alerts: { resultat_negatif: false, cash_flow_negatif: false, frais_vs_ca: 0 },
+  }, [synthesisData]);
 
-    // Cash flow calculation (production only)
-    const cashFlow = currentMonth 
-      ? Number(currentMonth.encaissements) - Number(currentMonth.decaissements)
-      : 0;
+  // Generate years list (current year and 2 previous)
+  const years = useMemo(() => {
+    const currentYear = currentDate.getFullYear();
+    return [currentYear, currentYear - 1, currentYear - 2];
+  }, []);
 
-    // Get current month expenses
-    const currentMonthStr = new Date().toISOString().slice(0, 7);
-    const monthlyExpenses = expensesSummary.by_month[currentMonthStr] || 0;
-    
-    // Calculate production costs from weighted margin
-    const totalCosts = totalCA * (1 - avgMargin / 100);
-    const margeBrute = totalCA - totalCosts;
-    const resultatNet = margeBrute - monthlyExpenses;
+  const topCategories = useMemo(() => {
+    if (!synthesis.par_categorie) return [];
 
-    return {
-      ca: totalCA,
-      caChange,
-      avgMargin,
-      productCount: products?.length || 0,
-      cashFlow,
-      monthlyExpenses,
-      margeBrute,
-      resultatNet,
-    };
-  }, [productsWithCosts, salesData, totals, currentMonth, products, expensesSummary]);
+    return synthesis.par_categorie
+      .slice(0, 4)
+      .map((cat) => ({
+        name: cat.category_name,
+        revenue: cat.ca,
+        margin: cat.rentabilite,
+        count: 1,
+      }));
+  }, [synthesis]);
 
-  const topProducts = useMemo(() => {
-    if (!productsWithCosts || !salesData) return [];
+  const isLoading = isLoadingWithCosts || isLoadingSynthesis;
 
-    return productsWithCosts
-      .map((p) => {
-        const sales = salesData.find((s) => s.product_id === p.id);
-        return {
-          name: p.nom_produit,
-          sold: sales?.reel_qty || 0,
-          revenue: sales?.reel_ca || 0,
-          margin: p.margin,
-        };
-      })
-      .filter((p) => p.sold > 0)
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 4);
-  }, [productsWithCosts, salesData]);
-
-  const isLoading = isLoadingWithCosts || isLoadingSales || isLoadingCashFlow || isLoadingExpenses;
-
-  // Calculate net cash flow after expenses
-  const netCashFlow = kpiData.cashFlow - kpiData.monthlyExpenses;
+  // Period label for display
+  const periodLabel = periodType === 'month' 
+    ? `${MONTHS[selectedMonth - 1]?.label} ${selectedYear}`
+    : `Année ${selectedYear}`;
+  
+  // Variation vs previous period
+  const variationCA = synthesis.previous 
+    ? ((synthesis.ca_ht - synthesis.previous.ca_ht) / synthesis.previous.ca_ht) * 100 
+    : 0;
 
   return (
     <AppLayout
       title="Tableau de bord"
       subtitle="Vue d'ensemble de votre activité"
     >
+      {/* Period Selector */}
+      <Card className="mb-6">
+        <CardContent className="flex flex-wrap items-center gap-4 p-4">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-muted-foreground" />
+            <span className="text-sm font-medium">Période :</span>
+          </div>
+          <Tabs value={periodType} onValueChange={(v) => setPeriodType(v as 'month' | 'year')}>
+            <TabsList>
+              <TabsTrigger value="month">Mois</TabsTrigger>
+              <TabsTrigger value="year">Année</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          {periodType === 'month' && (
+            <Select value={selectedMonth.toString()} onValueChange={(v) => setSelectedMonth(parseInt(v))}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTHS.map((month) => (
+                  <SelectItem key={month.value} value={month.value.toString()}>
+                    {month.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
+            <SelectTrigger className="w-[100px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {years.map((year) => (
+                <SelectItem key={year} value={year.toString()}>
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span className="ml-auto text-sm text-muted-foreground">{periodLabel}</span>
+        </CardContent>
+      </Card>
+
       {/* Alert if negative result */}
-      {!isLoading && kpiData.resultatNet < 0 && (
+      {!isLoading && synthesis.resultat_net < 0 && (
         <Card className="mb-6 border-destructive/50 bg-destructive/5">
           <CardContent className="flex items-center gap-4 p-4">
             <AlertTriangle className="h-5 w-5 text-destructive" />
             <div>
-              <p className="font-medium text-destructive">Résultat net négatif ce mois</p>
+              <p className="font-medium text-destructive">Résultat net négatif {periodType === 'month' ? 'ce mois' : 'cette année'}</p>
               <p className="text-sm text-muted-foreground">
-                Marge brute ({kpiData.margeBrute.toLocaleString('fr-FR')} €) - Frais pro. ({kpiData.monthlyExpenses.toLocaleString('fr-FR')} €) = {kpiData.resultatNet.toLocaleString('fr-FR')} €
+                Marge brute ({synthesis.marge_brute.toLocaleString('fr-FR')} €) - Frais ({synthesis.frais_professionnels.toLocaleString('fr-FR')} €) = {synthesis.resultat_net.toLocaleString('fr-FR')} €
               </p>
             </div>
           </CardContent>
@@ -122,35 +180,37 @@ const Index = () => {
         ) : (
           <>
             <KPICard
-              title="Chiffre d'affaires"
-              value={`${kpiData.ca.toLocaleString("fr-FR")} €`}
-              change={`${kpiData.caChange >= 0 ? "+" : ""}${kpiData.caChange.toFixed(1)}% vs objectif`}
-              changeType={kpiData.caChange >= 0 ? "positive" : "negative"}
+              title="Chiffre d'affaires HT"
+              value={`${synthesis.ca_ht.toLocaleString("fr-FR")} €`}
+              change={variationCA !== 0 
+                ? `${variationCA >= 0 ? "+" : ""}${variationCA.toFixed(1)}% vs période préc.`
+                : "Première période"}
+              changeType={variationCA >= 0 ? "positive" : "negative"}
               icon={TrendingUp}
-              tooltip="Total des ventes du mois en cours"
+              tooltip={`Total des ventes HT - ${periodLabel}`}
             />
             <KPICard
-              title="Marge brute moyenne"
-              value={`${kpiData.avgMargin.toFixed(1)}%`}
-              change={kpiData.avgMargin >= 35 ? "Objectif atteint" : "En dessous de l'objectif"}
-              changeType={kpiData.avgMargin >= 35 ? "positive" : "negative"}
+              title="Marge brute"
+              value={`${synthesis.taux_marge.toFixed(1)}%`}
+              change={synthesis.taux_marge >= 35 ? "Objectif atteint" : "En dessous de l'objectif"}
+              changeType={synthesis.taux_marge >= 35 ? "positive" : "negative"}
               icon={CircleDollarSign}
-              tooltip="Marge moyenne pondérée par le CA"
+              tooltip="Marge brute en pourcentage du CA"
             />
             <KPICard
               title="Frais professionnels"
-              value={`${kpiData.monthlyExpenses.toLocaleString("fr-FR")} €`}
-              change={kpiData.ca > 0 ? `${((kpiData.monthlyExpenses / kpiData.ca) * 100).toFixed(1)}% du CA` : "Aucun CA"}
-              changeType={kpiData.monthlyExpenses > kpiData.margeBrute ? "negative" : "neutral"}
+              value={`${synthesis.frais_professionnels.toLocaleString("fr-FR")} €`}
+              change={synthesis.ca_ht > 0 ? `${((synthesis.frais_professionnels / synthesis.ca_ht) * 100).toFixed(1)}% du CA` : "Aucun CA"}
+              changeType={synthesis.frais_professionnels > synthesis.marge_brute ? "negative" : "neutral"}
               icon={Receipt}
-              tooltip="Frais fixes du mois (hors production)"
+              tooltip="Frais fixes de la période"
             />
             <KPICard
               title="Résultat net"
-              value={`${kpiData.resultatNet.toLocaleString("fr-FR")} €`}
-              change={kpiData.resultatNet >= 0 ? "Rentable" : "Non rentable"}
-              changeType={kpiData.resultatNet >= 0 ? "positive" : "negative"}
-              icon={kpiData.resultatNet >= 0 ? TrendingUp : AlertTriangle}
+              value={`${synthesis.resultat_net.toLocaleString("fr-FR")} €`}
+              change={synthesis.resultat_net >= 0 ? "Rentable" : "Non rentable"}
+              changeType={synthesis.resultat_net >= 0 ? "positive" : "negative"}
+              icon={synthesis.resultat_net >= 0 ? TrendingUp : AlertTriangle}
               tooltip="Marge brute - Frais professionnels"
             />
           </>
@@ -163,32 +223,41 @@ const Index = () => {
           <>
             <Skeleton className="h-[120px]" />
             <Skeleton className="h-[120px]" />
+            <Skeleton className="h-[120px]" />
           </>
         ) : (
           <>
             <KPICard
               title="Produits actifs"
-              value={kpiData.productCount.toString()}
-              change={`${kpiData.productCount} produit${kpiData.productCount > 1 ? "s" : ""} en catalogue`}
+              value={(products?.length || 0).toString()}
+              change={`${products?.length || 0} produit${(products?.length || 0) > 1 ? "s" : ""} en catalogue`}
               changeType="neutral"
               icon={Package}
               tooltip="Nombre de produits en vente"
             />
             <KPICard
-              title="Cash-flow (production)"
-              value={`${kpiData.cashFlow.toLocaleString("fr-FR")} €`}
-              change={kpiData.cashFlow >= 0 ? "Positif" : "Négatif"}
-              changeType={kpiData.cashFlow >= 0 ? "positive" : "negative"}
-              icon={Wallet}
-              tooltip="Flux de trésorerie du mois (hors frais pro.)"
+              title="Volumes vendus"
+              value={synthesis.quantite_vendue.toLocaleString("fr-FR")}
+              change={`${synthesis.quantite_vendue} unités vendues`}
+              changeType="neutral"
+              icon={Package}
+              tooltip="Nombre total d'unités vendues"
             />
             <KPICard
-              title="Cash-flow après frais"
-              value={`${netCashFlow.toLocaleString("fr-FR")} €`}
-              change={netCashFlow >= 0 ? "Trésorerie saine" : "Tension de trésorerie"}
-              changeType={netCashFlow >= 0 ? "positive" : "negative"}
+              title="Cash-flow"
+              value={`${synthesis.cash_flow_apres_frais.toLocaleString("fr-FR")} €`}
+              change={synthesis.cash_flow_apres_frais >= 0 ? "Trésorerie positive" : "Tension de trésorerie"}
+              changeType={synthesis.cash_flow_apres_frais >= 0 ? "positive" : "negative"}
               icon={Wallet}
-              tooltip="Cash-flow production - Frais professionnels"
+              tooltip="Flux de trésorerie de la période"
+            />
+            <KPICard
+              title="CA TTC"
+              value={`${synthesis.ca_ttc.toLocaleString("fr-FR")} €`}
+              change={`TVA: ${(synthesis.ca_ttc - synthesis.ca_ht).toLocaleString("fr-FR")} €`}
+              changeType="neutral"
+              icon={TrendingUp}
+              tooltip="Chiffre d'affaires toutes taxes comprises"
             />
           </>
         )}
@@ -212,7 +281,7 @@ const Index = () => {
         <div className="rounded-lg border border-border bg-card p-6">
           <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-foreground">
             <ChefHat className="h-5 w-5 text-primary" />
-            Produits phares du mois
+            Top catégories - {periodLabel}
           </h3>
           {isLoading ? (
             <div className="space-y-4">
@@ -221,29 +290,26 @@ const Index = () => {
               <Skeleton className="h-[72px]" />
               <Skeleton className="h-[72px]" />
             </div>
-          ) : topProducts.length === 0 ? (
+          ) : topCategories.length === 0 ? (
             <div className="flex h-[300px] items-center justify-center text-muted-foreground">
               Aucune vente enregistrée
             </div>
           ) : (
             <div className="space-y-4">
-              {topProducts.map((product, index) => (
+              {topCategories.map((cat, index) => (
                 <div
                   key={index}
                   className="flex items-center justify-between rounded-lg border border-border bg-background p-4"
                 >
                   <div>
-                    <p className="font-medium text-foreground">{product.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {product.sold} unités vendues
-                    </p>
+                    <p className="font-medium text-foreground">{cat.name}</p>
                   </div>
                   <div className="text-right">
                     <p className="font-semibold text-foreground">
-                      {product.revenue.toLocaleString("fr-FR")} €
+                      {cat.revenue.toLocaleString("fr-FR")} €
                     </p>
                     <p className="text-sm text-primary">
-                      {product.margin.toFixed(1)}% marge
+                      {cat.margin.toFixed(1)}% marge
                     </p>
                   </div>
                 </div>

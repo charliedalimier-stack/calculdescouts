@@ -15,6 +15,12 @@ export interface GlobalSynthesis {
   resultat_avant_charges: number;
   cash_flow: number;
   
+  // Professional expenses
+  frais_professionnels: number;
+  frais_tva_deductible: number;
+  resultat_net: number;
+  cash_flow_apres_frais: number;
+  
   // By channel
   par_canal: {
     canal: string;
@@ -49,7 +55,16 @@ export interface GlobalSynthesis {
     mois: string;
     ca_ht: number;
     marge: number;
+    frais: number;
+    resultat_net: number;
   }[];
+  
+  // Alerts
+  alerts: {
+    frais_vs_ca: number; // % of frais / CA
+    resultat_negatif: boolean;
+    cash_flow_negatif: boolean;
+  };
 }
 
 interface UseGlobalSynthesisParams {
@@ -103,7 +118,30 @@ export function useGlobalSynthesis({ periodType, year, month }: UseGlobalSynthes
         .eq('mode', mode);
 
       if (!products || products.length === 0) {
-        return getEmptySynthesis();
+        // Even with no products, we might have expenses
+        const { data: expensesData } = await supabase
+          .from('professional_expenses')
+          .select('*')
+          .eq('project_id', projectId)
+          .eq('mode', mode)
+          .gte('mois', startDate)
+          .lte('mois', endDate);
+
+        const fraisPro = (expensesData || []).reduce((sum, e) => sum + Number(e.montant_ht), 0);
+        const fraisTva = (expensesData || []).reduce((sum, e) => sum + (Number(e.montant_ttc) - Number(e.montant_ht)), 0);
+
+        return {
+          ...getEmptySynthesis(),
+          frais_professionnels: fraisPro,
+          frais_tva_deductible: fraisTva,
+          resultat_net: -fraisPro,
+          cash_flow_apres_frais: -fraisPro - fraisTva,
+          alerts: {
+            frais_vs_ca: 0,
+            resultat_negatif: fraisPro > 0,
+            cash_flow_negatif: fraisPro > 0,
+          },
+        };
       }
 
       // Fetch project settings for TVA rates
@@ -134,6 +172,15 @@ export function useGlobalSynthesis({ periodType, year, month }: UseGlobalSynthes
         .eq('project_id', projectId)
         .gte('mois', prevStartDate)
         .lte('mois', prevEndDate);
+
+      // Fetch professional expenses
+      const { data: expensesData } = await supabase
+        .from('professional_expenses')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('mode', mode)
+        .gte('mois', startDate)
+        .lte('mois', endDate);
 
       // Fetch recipes for cost calculation
       const { data: recipes } = await supabase
@@ -240,6 +287,17 @@ export function useGlobalSynthesis({ periodType, year, month }: UseGlobalSynthes
         canalData['BTC'].marge += marge;
       });
 
+      // Calculate professional expenses
+      const fraisPro = (expensesData || []).reduce((sum, e) => sum + Number(e.montant_ht), 0);
+      const fraisTva = (expensesData || []).reduce((sum, e) => sum + (Number(e.montant_ttc) - Number(e.montant_ht)), 0);
+
+      // Calculate expenses by month for chart
+      const expensesByMonth: { [m: string]: number } = {};
+      (expensesData || []).forEach(e => {
+        const mois = e.mois?.slice(0, 7) || '';
+        expensesByMonth[mois] = (expensesByMonth[mois] || 0) + Number(e.montant_ht);
+      });
+
       // Previous period data
       let prevCaHt = 0;
       let prevMarge = 0;
@@ -263,7 +321,7 @@ export function useGlobalSynthesis({ periodType, year, month }: UseGlobalSynthes
       });
 
       // Monthly breakdown
-      const monthlyMap: { [m: string]: { ca: number; marge: number } } = {};
+      const monthlyMap: { [m: string]: { ca: number; marge: number; frais: number } } = {};
       
       (sales || []).forEach(sale => {
         const product = products.find(p => p.id === sale.product_id);
@@ -277,20 +335,36 @@ export function useGlobalSynthesis({ periodType, year, month }: UseGlobalSynthes
 
         const mois = (sale as any).mois?.slice(0, 7) || '';
         if (!monthlyMap[mois]) {
-          monthlyMap[mois] = { ca: 0, marge: 0 };
+          monthlyMap[mois] = { ca: 0, marge: 0, frais: 0 };
         }
         monthlyMap[mois].ca += caHt;
         monthlyMap[mois].marge += marge;
       });
 
+      // Add expenses to monthly map
+      Object.entries(expensesByMonth).forEach(([mois, frais]) => {
+        if (!monthlyMap[mois]) {
+          monthlyMap[mois] = { ca: 0, marge: 0, frais: 0 };
+        }
+        monthlyMap[mois].frais += frais;
+      });
+
       const monthlyData = Object.entries(monthlyMap)
-        .map(([mois, data]) => ({ mois, ca_ht: data.ca, marge: data.marge }))
+        .map(([mois, data]) => ({
+          mois,
+          ca_ht: data.ca,
+          marge: data.marge,
+          frais: data.frais,
+          resultat_net: data.marge - data.frais,
+        }))
         .sort((a, b) => a.mois.localeCompare(b.mois));
 
       // Build result
       const margeBrute = totalCaHt - totalCoutProduction;
       const tauxMarge = totalCaHt > 0 ? (margeBrute / totalCaHt) * 100 : 0;
+      const resultatNet = margeBrute - fraisPro;
       const cashFlow = totalCaHt + totalTvaCollectee - totalCoutProduction - totalTvaDeductible;
+      const cashFlowApresFrais = cashFlow - fraisPro - fraisTva + fraisTva; // fraisTva is deductible
       const prevCashFlowValue = prevCaHt > 0 ? prevCashFlow : 0;
 
       const parCategorie = Object.entries(categoryData).map(([id, data]) => ({
@@ -318,9 +392,13 @@ export function useGlobalSynthesis({ periodType, year, month }: UseGlobalSynthes
         marge_brute: margeBrute,
         taux_marge: tauxMarge,
         tva_collectee: totalTvaCollectee,
-        tva_deductible: totalTvaDeductible,
+        tva_deductible: totalTvaDeductible + fraisTva,
         resultat_avant_charges: margeBrute,
         cash_flow: cashFlow,
+        frais_professionnels: fraisPro,
+        frais_tva_deductible: fraisTva,
+        resultat_net: resultatNet,
+        cash_flow_apres_frais: cashFlowApresFrais,
         par_canal: parCanal,
         par_categorie: parCategorie,
         quantite_vendue: totalQuantite,
@@ -332,6 +410,11 @@ export function useGlobalSynthesis({ periodType, year, month }: UseGlobalSynthes
           cash_flow: prevCashFlowValue,
         } : null,
         monthly_data: monthlyData,
+        alerts: {
+          frais_vs_ca: totalCaHt > 0 ? (fraisPro / totalCaHt) * 100 : 0,
+          resultat_negatif: resultatNet < 0,
+          cash_flow_negatif: cashFlowApresFrais < 0,
+        },
       };
     },
     enabled: !!currentProject?.id,
@@ -349,6 +432,10 @@ function getEmptySynthesis(): GlobalSynthesis {
     tva_deductible: 0,
     resultat_avant_charges: 0,
     cash_flow: 0,
+    frais_professionnels: 0,
+    frais_tva_deductible: 0,
+    resultat_net: 0,
+    cash_flow_apres_frais: 0,
     par_canal: [],
     par_categorie: [],
     quantite_vendue: 0,
@@ -356,5 +443,10 @@ function getEmptySynthesis(): GlobalSynthesis {
     nb_produits_actifs: 0,
     previous: null,
     monthly_data: [],
+    alerts: {
+      frais_vs_ca: 0,
+      resultat_negatif: false,
+      cash_flow_negatif: false,
+    },
   };
 }

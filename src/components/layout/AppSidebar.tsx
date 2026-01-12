@@ -18,6 +18,7 @@ import {
   Warehouse,
   Receipt,
   Globe,
+  Briefcase,
 } from "lucide-react";
 import {
   Sidebar,
@@ -52,6 +53,7 @@ const productionNavItems = [
 
 const analysisNavItems = [
   { title: "Ventes", icon: TrendingUp, path: "/sales" },
+  { title: "Frais professionnels", icon: Briefcase, path: "/expenses" },
   { title: "Cash-flow", icon: Wallet, path: "/cashflow" },
   { title: "TVA", icon: Receipt, path: "/tva" },
   { title: "Analyses", icon: BarChart3, path: "/analysis" },

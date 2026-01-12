@@ -160,10 +160,17 @@ export function useGlobalSynthesis({ periodType, year, month }: UseGlobalSynthes
       
       const { data: sales } = await supabase
         .from(salesTable)
-        .select('*')
+        .select('*, categorie_prix')
         .eq('project_id', projectId)
         .gte('mois', startDate)
         .lte('mois', endDate);
+
+      // Fetch product prices by category
+      const { data: productPrices } = await supabase
+        .from('product_prices')
+        .select('*')
+        .in('product_id', products.map(p => p.id))
+        .eq('mode', mode);
 
       // Fetch previous period sales
       const { data: prevSales } = await supabase
@@ -240,6 +247,13 @@ export function useGlobalSynthesis({ periodType, year, month }: UseGlobalSynthes
         productCosts[product.id] = { cost: totalCost, tvaDed: totalTvaDed };
       });
 
+      // Build price lookup by product and category
+      const priceMap: { [key: string]: number } = {};
+      (productPrices || []).forEach(pp => {
+        const key = `${pp.product_id}-${pp.categorie_prix}`;
+        priceMap[key] = Number(pp.prix_ht);
+      });
+
       // Aggregate current period data
       let totalCaHt = 0;
       let totalTvaCollectee = 0;
@@ -247,7 +261,11 @@ export function useGlobalSynthesis({ periodType, year, month }: UseGlobalSynthes
       let totalTvaDeductible = 0;
       let totalQuantite = 0;
       const categoryData: { [catId: string]: { name: string; ca: number; marge: number; cout: number } } = {};
-      const canalData: { [canal: string]: { ca: number; marge: number } } = { 'BTC': { ca: 0, marge: 0 } };
+      const canalData: { [canal: string]: { ca: number; marge: number } } = { 
+        'BTC': { ca: 0, marge: 0 },
+        'BTB': { ca: 0, marge: 0 },
+        'Distributeur': { ca: 0, marge: 0 },
+      };
 
       (sales || []).forEach(sale => {
         const product = products.find(p => p.id === sale.product_id);
@@ -256,7 +274,11 @@ export function useGlobalSynthesis({ periodType, year, month }: UseGlobalSynthes
         const qty = Number((sale as any)[qtyField] || 0);
         if (qty === 0) return;
 
-        const prixHt = Number(product.prix_btc);
+        // Get price for the sales channel (categorie_prix)
+        const categoriePrix = (sale as any).categorie_prix || 'BTC';
+        const priceKey = `${product.id}-${categoriePrix}`;
+        const prixHt = priceMap[priceKey] || Number(product.prix_btc);
+        
         const tvaTaux = Number(product.tva_taux || tvaVente);
         const caHt = qty * prixHt;
         const tvaCollectee = caHt * (tvaTaux / 100);
@@ -272,7 +294,7 @@ export function useGlobalSynthesis({ periodType, year, month }: UseGlobalSynthes
         totalTvaDeductible += tvaDeductible;
         totalQuantite += qty;
 
-        // By category
+        // By product category
         const catId = product.categorie_id || 'sans-categorie';
         const catName = (product.categories as any)?.nom_categorie || 'Sans catégorie';
         if (!categoryData[catId]) {
@@ -282,9 +304,12 @@ export function useGlobalSynthesis({ periodType, year, month }: UseGlobalSynthes
         categoryData[catId].marge += marge;
         categoryData[catId].cout += coutTotal;
 
-        // By canal (default BTC)
-        canalData['BTC'].ca += caHt;
-        canalData['BTC'].marge += marge;
+        // By sales channel (BTC, BTB, Distributeur)
+        if (!canalData[categoriePrix]) {
+          canalData[categoriePrix] = { ca: 0, marge: 0 };
+        }
+        canalData[categoriePrix].ca += caHt;
+        canalData[categoriePrix].marge += marge;
       });
 
       // Calculate professional expenses

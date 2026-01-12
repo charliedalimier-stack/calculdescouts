@@ -19,12 +19,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { TrendingUp, TrendingDown, Target, BarChart3, Calendar, CalendarRange } from "lucide-react";
+import { TrendingUp, TrendingDown, Target, BarChart3, Calendar, CalendarRange, Tags } from "lucide-react";
 import { useSales, useAnnualSales } from "@/hooks/useSales";
+import { useSalesByCategory } from "@/hooks/useSalesByCategory";
 import { AnnualSalesTable } from "@/components/sales/AnnualSalesTable";
+import { SalesByCategoryTable } from "@/components/sales/SalesByCategoryTable";
 import { Skeleton } from "@/components/ui/skeleton";
 
-type ViewMode = 'monthly' | 'annual';
+type ViewMode = 'monthly' | 'annual' | 'category';
 
 const getEcartBadge = (ecart: number) => {
   if (ecart > 0) {
@@ -74,6 +76,7 @@ const Sales = () => {
   
   const { salesData, totals, isLoading, setSalesTarget, setSalesActual } = useSales(selectedMonth);
   const { annualData, annualTotals, isLoading: isLoadingAnnual, setSalesValue } = useAnnualSales(selectedYear);
+  const { totals: categoryTotals, isLoading: isLoadingCategory } = useSalesByCategory(selectedMonth);
   
   const [editingCell, setEditingCell] = useState<{ productId: string; field: 'objectif' | 'reel' } | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -118,8 +121,19 @@ const Sales = () => {
   };
 
   // Determine which totals to display based on view mode
-  const displayTotals = viewMode === 'monthly' ? totals : annualTotals;
-  const currentIsLoading = viewMode === 'monthly' ? isLoading : isLoadingAnnual;
+  const displayTotals = viewMode === 'annual' 
+    ? annualTotals 
+    : viewMode === 'category' 
+      ? { 
+          objectif_ca: categoryTotals.target_ca, 
+          reel_ca: categoryTotals.actual_ca, 
+          ecart_ca: categoryTotals.actual_ca - categoryTotals.target_ca,
+          ecart_percent: categoryTotals.target_ca > 0 
+            ? ((categoryTotals.actual_ca - categoryTotals.target_ca) / categoryTotals.target_ca) * 100 
+            : 0,
+        }
+      : totals;
+  const currentIsLoading = viewMode === 'monthly' ? isLoading : viewMode === 'annual' ? isLoadingAnnual : isLoadingCategory;
 
   if (currentIsLoading) {
     return (
@@ -153,16 +167,20 @@ const Sales = () => {
           <TabsList>
             <TabsTrigger value="monthly" className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
-              Vue mensuelle
+              Mensuelle
+            </TabsTrigger>
+            <TabsTrigger value="category" className="flex items-center gap-2">
+              <Tags className="h-4 w-4" />
+              Par canal
             </TabsTrigger>
             <TabsTrigger value="annual" className="flex items-center gap-2">
               <CalendarRange className="h-4 w-4" />
-              Vue annuelle
+              Annuelle
             </TabsTrigger>
           </TabsList>
         </Tabs>
 
-        {viewMode === 'monthly' ? (
+        {(viewMode === 'monthly' || viewMode === 'category') && (
           <Select value={selectedMonth} onValueChange={setSelectedMonth}>
             <SelectTrigger className="w-64">
               <SelectValue />
@@ -175,7 +193,8 @@ const Sales = () => {
               ))}
             </SelectContent>
           </Select>
-        ) : (
+        )}
+        {viewMode === 'annual' && (
           <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
             <SelectTrigger className="w-40">
               <SelectValue />
@@ -386,6 +405,11 @@ const Sales = () => {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* Category View */}
+      {viewMode === 'category' && (
+        <SalesByCategoryTable month={selectedMonth} />
       )}
 
       {/* Annual View */}

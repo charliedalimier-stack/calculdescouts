@@ -9,17 +9,8 @@ import {
   Cell,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-const data = [
-  { name: "Sauce tomate", margin: 45, category: "Sauces" },
-  { name: "Confiture fraise", margin: 38, category: "Confitures" },
-  { name: "Pesto basilic", margin: 52, category: "Sauces" },
-  { name: "Terrine porc", margin: 28, category: "Terrines" },
-  { name: "Jus pomme", margin: 35, category: "Boissons" },
-  { name: "Miel lavande", margin: 48, category: "Miels" },
-  { name: "Rillettes", margin: 22, category: "Terrines" },
-  { name: "Sirop menthe", margin: 42, category: "Boissons" },
-];
+import { useProducts } from "@/hooks/useProducts";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const getBarColor = (margin: number) => {
   if (margin >= 40) return "hsl(var(--chart-1))";
@@ -28,6 +19,50 @@ const getBarColor = (margin: number) => {
 };
 
 export function MarginChart() {
+  const { productsWithCosts, isLoadingWithCosts } = useProducts();
+
+  const data = productsWithCosts
+    ?.filter((p) => p.margin !== null && p.margin !== undefined)
+    .map((p) => ({
+      name: p.nom_produit.length > 15 ? p.nom_produit.substring(0, 15) + "..." : p.nom_produit,
+      margin: Number((p.margin || 0).toFixed(1)),
+      category: p.category_name || "Sans catégorie",
+    }))
+    .sort((a, b) => b.margin - a.margin)
+    .slice(0, 8) || [];
+
+  if (isLoadingWithCosts) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-semibold">
+            Marge brute par produit (%)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-[300px] w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (data.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-semibold">
+            Marge brute par produit (%)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex h-[300px] items-center justify-center text-muted-foreground">
+            Aucun produit avec des données de marge
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -42,7 +77,7 @@ export function MarginChart() {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis
                 type="number"
-                domain={[0, 60]}
+                domain={[0, 100]}
                 tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
               />
               <YAxis

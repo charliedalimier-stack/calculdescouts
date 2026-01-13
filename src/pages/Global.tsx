@@ -50,33 +50,16 @@ import { useGlobalSynthesis } from "@/hooks/useGlobalSynthesis";
 import { useMode } from "@/contexts/ModeContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { getYearOptions, getCurrentYear, MONTH_LABELS_FULL } from "@/lib/dateOptions";
 
 type PeriodType = 'month' | 'year';
 
-const MONTHS = [
-  { value: 1, label: "Janvier" },
-  { value: 2, label: "Février" },
-  { value: 3, label: "Mars" },
-  { value: 4, label: "Avril" },
-  { value: 5, label: "Mai" },
-  { value: 6, label: "Juin" },
-  { value: 7, label: "Juillet" },
-  { value: 8, label: "Août" },
-  { value: 9, label: "Septembre" },
-  { value: 10, label: "Octobre" },
-  { value: 11, label: "Novembre" },
-  { value: 12, label: "Décembre" },
-];
+const MONTHS = MONTH_LABELS_FULL.map((label, index) => ({
+  value: index + 1,
+  label,
+}));
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
-
-const getYearOptions = () => {
-  const currentYear = new Date().getFullYear();
-  return [currentYear - 2, currentYear - 1, currentYear, currentYear + 1].map(year => ({
-    value: year.toString(),
-    label: year.toString(),
-  }));
-};
 
 const formatCurrency = (value: number) => 
   value.toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €';
@@ -127,10 +110,9 @@ const getVariationBadge = (current: number, previous: number) => {
 
 const Global = () => {
   const { mode } = useMode();
-  const currentDate = new Date();
   const [periodType, setPeriodType] = useState<PeriodType>('month');
-  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(getCurrentYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
 
   const { data: synthesis, isLoading } = useGlobalSynthesis({
     periodType,

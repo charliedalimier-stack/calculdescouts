@@ -43,31 +43,14 @@ import {
 import { useBudgetVsReel } from "@/hooks/useBudgetVsReel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { getYearOptions, getCurrentYear, MONTH_LABELS_FULL } from "@/lib/dateOptions";
 
 type PeriodType = 'month' | 'year';
 
-const MONTHS = [
-  { value: 1, label: "Janvier" },
-  { value: 2, label: "Février" },
-  { value: 3, label: "Mars" },
-  { value: 4, label: "Avril" },
-  { value: 5, label: "Mai" },
-  { value: 6, label: "Juin" },
-  { value: 7, label: "Juillet" },
-  { value: 8, label: "Août" },
-  { value: 9, label: "Septembre" },
-  { value: 10, label: "Octobre" },
-  { value: 11, label: "Novembre" },
-  { value: 12, label: "Décembre" },
-];
-
-const getYearOptions = () => {
-  const currentYear = new Date().getFullYear();
-  return [currentYear - 2, currentYear - 1, currentYear, currentYear + 1].map(year => ({
-    value: year.toString(),
-    label: year.toString(),
-  }));
-};
+const MONTHS = MONTH_LABELS_FULL.map((label, index) => ({
+  value: index + 1,
+  label,
+}));
 
 const formatCurrency = (value: number) => 
   value.toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €';

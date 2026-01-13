@@ -14,16 +14,29 @@ import {
   Cell,
   Line,
   ComposedChart,
+  ReferenceLine,
 } from "recharts";
-import { BarChart3, TrendingUp, AlertCircle } from "lucide-react";
+import { BarChart3, TrendingUp, AlertCircle, Info } from "lucide-react";
 import { useProducts } from "@/hooks/useProducts";
 import { useSales } from "@/hooks/useSales";
+import { useProjectSettings } from "@/hooks/useProjectSettings";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMemo } from "react";
+import {
+  Tooltip as UITooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const Analysis = () => {
   const { productsWithCosts, isLoadingWithCosts } = useProducts();
   const { salesData, isLoading: isLoadingSales } = useSales();
+  const { settings, isLoading: isLoadingSettings } = useProjectSettings();
+
+  // Get coefficient thresholds from settings (single source of truth)
+  const coefficientCible = settings?.coefficient_cible ?? 2.5;
+  const coefficientMin = settings?.coefficient_min ?? 2.0;
 
   // Pareto analysis - calculate CA by product
   const paretoData = useMemo(() => {
@@ -57,7 +70,7 @@ const Analysis = () => {
     }).slice(0, 8);
   }, [productsWithCosts, salesData]);
 
-  // Coefficient dispersion data
+  // Coefficient dispersion data - using settings thresholds
   const coefficientData = useMemo(() => {
     if (!productsWithCosts) return [];
 
@@ -65,12 +78,13 @@ const Analysis = () => {
       .filter((p) => p.coefficient > 0)
       .map((p) => ({
         name: p.nom_produit.length > 12 ? p.nom_produit.substring(0, 12) + "..." : p.nom_produit,
+        fullName: p.nom_produit,
         coefficient: Number(p.coefficient.toFixed(2)),
-        target: 2.0,
+        target: coefficientCible,
       }))
       .sort((a, b) => b.coefficient - a.coefficient)
       .slice(0, 8);
-  }, [productsWithCosts]);
+  }, [productsWithCosts, coefficientCible]);
 
   // Find key products for 80% CA threshold
   const keyProductsCount = useMemo(() => {
@@ -84,22 +98,22 @@ const Analysis = () => {
     return keyProducts.length > 0 ? keyProducts[keyProducts.length - 1]?.cumulPercent || 0 : 0;
   }, [paretoData, keyProductsCount]);
 
-  // Insights generation
+  // Insights generation - using settings thresholds
   const insights = useMemo(() => {
     if (!productsWithCosts) return [];
 
     const result = [];
 
-    // Find products with low coefficient
+    // Find products with low coefficient (using settings threshold)
     const lowCoefProducts = productsWithCosts
-      .filter((p) => p.coefficient > 0 && p.coefficient < 1.7)
+      .filter((p) => p.coefficient > 0 && p.coefficient < coefficientMin)
       .map((p) => p.nom_produit);
 
     if (lowCoefProducts.length > 0) {
       result.push({
         type: "error",
         title: lowCoefProducts.slice(0, 2).join(" & "),
-        message: "Coefficient inférieur à 1.7x. Augmentez le prix de vente ou réduisez les coûts de production.",
+        message: `Coefficient inférieur à ${coefficientMin}x. Augmentez le prix de vente ou réduisez les coûts de production.`,
       });
     }
 
@@ -118,7 +132,7 @@ const Analysis = () => {
       return best;
     }, null as typeof productsWithCosts[0] | null);
 
-    if (bestProduct && bestProduct.coefficient >= 2.0) {
+    if (bestProduct && bestProduct.coefficient >= coefficientCible) {
       result.push({
         type: "success",
         title: bestProduct.nom_produit,
@@ -127,9 +141,9 @@ const Analysis = () => {
     }
 
     return result;
-  }, [productsWithCosts, keyProductsCount, paretoThresholdPercent, paretoData.length]);
+  }, [productsWithCosts, keyProductsCount, paretoThresholdPercent, paretoData.length, coefficientMin, coefficientCible]);
 
-  const isLoading = isLoadingWithCosts || isLoadingSales;
+  const isLoading = isLoadingWithCosts || isLoadingSales || isLoadingSettings;
 
   return (
     <AppLayout
@@ -236,6 +250,23 @@ const Analysis = () => {
           <CardTitle className="flex items-center gap-2 text-base">
             <TrendingUp className="h-5 w-5 text-primary" />
             Dispersion des coefficients
+            <TooltipProvider>
+              <UITooltip>
+                <TooltipTrigger>
+                  <Info className="h-4 w-4 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="font-medium">Coefficient = Prix de vente HT ÷ Coût de production</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Plus le coefficient est élevé, plus la marge est importante. 
+                    Un coefficient de {coefficientCible}x est considéré comme optimal.
+                  </p>
+                </TooltipContent>
+              </UITooltip>
+            </TooltipProvider>
+            <Badge variant="outline" className="ml-auto text-xs">
+              Cible: {coefficientCible}x | Min: {coefficientMin}x
+            </Badge>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -253,7 +284,7 @@ const Analysis = () => {
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis
                       type="number"
-                      domain={[0, 3]}
+                      domain={[0, Math.max(3, coefficientCible + 0.5)]}
                       tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
                     />
                     <YAxis
@@ -262,6 +293,8 @@ const Analysis = () => {
                       tick={{ fill: "hsl(var(--foreground))", fontSize: 12 }}
                       width={100}
                     />
+                    <ReferenceLine x={coefficientCible} stroke="hsl(var(--chart-1))" strokeDasharray="5 5" label={{ value: 'Cible', fill: 'hsl(var(--chart-1))', fontSize: 10 }} />
+                    <ReferenceLine x={coefficientMin} stroke="hsl(var(--chart-4))" strokeDasharray="5 5" label={{ value: 'Min', fill: 'hsl(var(--chart-4))', fontSize: 10 }} />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
@@ -269,15 +302,16 @@ const Analysis = () => {
                         borderRadius: "var(--radius)",
                       }}
                       formatter={(value: number) => [`${value.toFixed(2)}x`, "Coefficient"]}
+                      labelFormatter={(_, payload) => payload[0]?.payload?.fullName || payload[0]?.payload?.name || ""}
                     />
                     <Bar dataKey="coefficient" radius={[0, 4, 4, 0]}>
                       {coefficientData.map((entry, index) => (
                         <Cell
                           key={`cell-${index}`}
                           fill={
-                            entry.coefficient >= 2.0
+                            entry.coefficient >= coefficientCible
                               ? "hsl(var(--chart-1))"
-                              : entry.coefficient >= 1.7
+                              : entry.coefficient >= coefficientMin
                               ? "hsl(var(--chart-4))"
                               : "hsl(var(--destructive))"
                           }
@@ -290,15 +324,15 @@ const Analysis = () => {
               <div className="mt-4 flex items-center justify-center gap-6 text-xs">
                 <div className="flex items-center gap-2">
                   <div className="h-3 w-3 rounded" style={{ backgroundColor: "hsl(var(--chart-1))" }} />
-                  <span className="text-muted-foreground">Optimal (≥2.0x)</span>
+                  <span className="text-muted-foreground">Optimal (≥{coefficientCible}x)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="h-3 w-3 rounded" style={{ backgroundColor: "hsl(var(--chart-4))" }} />
-                  <span className="text-muted-foreground">Acceptable (1.7-2.0x)</span>
+                  <span className="text-muted-foreground">Acceptable ({coefficientMin}-{coefficientCible}x)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="h-3 w-3 rounded" style={{ backgroundColor: "hsl(var(--destructive))" }} />
-                  <span className="text-muted-foreground">Insuffisant (&lt;1.7x)</span>
+                  <span className="text-muted-foreground">Insuffisant (&lt;{coefficientMin}x)</span>
                 </div>
               </div>
             </>

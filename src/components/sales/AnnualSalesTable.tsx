@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -19,24 +19,7 @@ import {
 } from "@/components/ui/tooltip";
 import { AlertCircle, TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface AnnualSalesRow {
-  product_id: string;
-  product_name: string;
-  category_name: string | null;
-  prix_btc: number;
-  months: {
-    [month: string]: {
-      objectif: number;
-      reel: number;
-    };
-  };
-  total_objectif: number;
-  total_reel: number;
-  total_ca_objectif: number;
-  total_ca_reel: number;
-  ecart_percent: number;
-}
+import { AnnualSalesRow } from "@/hooks/useSales";
 
 interface Props {
   year: number;

@@ -20,13 +20,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { StockMovementDialog } from "./StockMovementDialog";
 
 interface StockTableProps {
   stocks: Stock[];
@@ -52,11 +46,9 @@ export function StockTable({
 }: StockTableProps) {
   const [movementDialog, setMovementDialog] = useState<{
     open: boolean;
-    stockId: string;
+    stock: Stock | null;
     type: "entree" | "sortie";
-  }>({ open: false, stockId: "", type: "entree" });
-  const [movementQty, setMovementQty] = useState("");
-  const [movementMotif, setMovementMotif] = useState("");
+  }>({ open: false, stock: null, type: "entree" });
 
   const [editDialog, setEditDialog] = useState<{
     open: boolean;
@@ -89,20 +81,15 @@ export function StockTable({
   };
 
   const getStockStatus = (stock: Stock) => {
-    if (!stock.seuil_alerte) return "normal";
     if (stock.quantite <= 0) return "rupture";
-    if (stock.quantite <= stock.seuil_alerte) return "alerte";
+    if (stock.seuil_alerte && stock.quantite <= stock.seuil_alerte) return "alerte";
     return "normal";
   };
 
-  const handleMovementSubmit = () => {
-    const qty = parseFloat(movementQty);
-    if (isNaN(qty) || qty <= 0) return;
-
-    onAddMovement(movementDialog.stockId, movementDialog.type, qty, movementMotif);
-    setMovementDialog({ open: false, stockId: "", type: "entree" });
-    setMovementQty("");
-    setMovementMotif("");
+  const handleMovementSubmit = (data: { quantite: number; motif: string }) => {
+    if (!movementDialog.stock) return;
+    onAddMovement(movementDialog.stock.id, movementDialog.type, data.quantite, data.motif);
+    setMovementDialog({ open: false, stock: null, type: "entree" });
   };
 
   const handleEditSubmit = () => {
@@ -120,10 +107,17 @@ export function StockTable({
     setEditDialog({ open: true, stock });
   };
 
+  const openMovementDialog = (stock: Stock, type: "entree" | "sortie") => {
+    setMovementDialog({ open: true, stock, type });
+  };
+
   if (stocks.length === 0) {
     return (
       <div className="rounded-lg border border-dashed p-8 text-center">
         <p className="text-muted-foreground">Aucun stock de {title.toLowerCase()}</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Cliquez sur "Ajouter un stock" pour créer un stock initial
+        </p>
       </div>
     );
   }
@@ -187,28 +181,16 @@ export function StockTable({
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() =>
-                          setMovementDialog({
-                            open: true,
-                            stockId: stock.id,
-                            type: "entree",
-                          })
-                        }
-                        title="Entrée"
+                        onClick={() => openMovementDialog(stock, "entree")}
+                        title="Entrée de stock"
                       >
                         <Plus className="h-4 w-4 text-green-500" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() =>
-                          setMovementDialog({
-                            open: true,
-                            stockId: stock.id,
-                            type: "sortie",
-                          })
-                        }
-                        title="Sortie"
+                        onClick={() => openMovementDialog(stock, "sortie")}
+                        title="Sortie de stock"
                       >
                         <Minus className="h-4 w-4 text-red-500" />
                       </Button>
@@ -216,6 +198,7 @@ export function StockTable({
                         variant="ghost"
                         size="icon"
                         onClick={() => openEditDialog(stock)}
+                        title="Modifier"
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -223,6 +206,7 @@ export function StockTable({
                         variant="ghost"
                         size="icon"
                         onClick={() => onDelete(stock.id)}
+                        title="Supprimer"
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
@@ -236,74 +220,16 @@ export function StockTable({
       </div>
 
       {/* Movement Dialog */}
-      <Dialog
-        open={movementDialog.open}
-        onOpenChange={(open) =>
-          setMovementDialog({ ...movementDialog, open })
-        }
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {movementDialog.type === "entree"
-                ? "Entrée de stock"
-                : "Sortie de stock"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Quantité</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={movementQty}
-                onChange={(e) => setMovementQty(e.target.value)}
-                placeholder="Quantité"
-              />
-            </div>
-            <div>
-              <Label>Motif</Label>
-              <Select value={movementMotif} onValueChange={setMovementMotif}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner un motif" />
-                </SelectTrigger>
-                <SelectContent>
-                  {movementDialog.type === "entree" ? (
-                    <>
-                      <SelectItem value="Achat">Achat</SelectItem>
-                      <SelectItem value="Production">Production</SelectItem>
-                      <SelectItem value="Retour">Retour</SelectItem>
-                      <SelectItem value="Inventaire">
-                        Ajustement inventaire
-                      </SelectItem>
-                    </>
-                  ) : (
-                    <>
-                      <SelectItem value="Vente">Vente</SelectItem>
-                      <SelectItem value="Consommation">Consommation</SelectItem>
-                      <SelectItem value="Perte">Perte / Casse</SelectItem>
-                      <SelectItem value="Inventaire">
-                        Ajustement inventaire
-                      </SelectItem>
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() =>
-                setMovementDialog({ open: false, stockId: "", type: "entree" })
-              }
-            >
-              Annuler
-            </Button>
-            <Button onClick={handleMovementSubmit}>Confirmer</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {movementDialog.stock && (
+        <StockMovementDialog
+          open={movementDialog.open}
+          onOpenChange={(open) => !open && setMovementDialog({ open: false, stock: null, type: "entree" })}
+          type={movementDialog.type}
+          stockName={getStockName(movementDialog.stock)}
+          stockUnit={getStockUnit(movementDialog.stock)}
+          onSubmit={handleMovementSubmit}
+        />
+      )}
 
       {/* Edit Dialog */}
       <Dialog

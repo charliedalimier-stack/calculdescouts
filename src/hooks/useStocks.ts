@@ -45,6 +45,7 @@ export interface StockInsert {
   quantite: number;
   cout_unitaire: number;
   seuil_alerte?: number | null;
+  date_initial?: string | null;
 }
 
 export interface StockSummary {

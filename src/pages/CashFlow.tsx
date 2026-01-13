@@ -36,6 +36,8 @@ import {
 import { Wallet, TrendingUp, TrendingDown, AlertTriangle, Plus, Trash2, Receipt } from "lucide-react";
 import { useCashFlow } from "@/hooks/useCashFlow";
 import { useExpenses } from "@/hooks/useExpenses";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
+import { DEFINITIONS } from "@/lib/pedagogicDefinitions";
 
 const getSoldeBadge = (solde: number) => {
   if (solde > 0) {
@@ -195,7 +197,10 @@ const CashFlow = () => {
                 <TrendingUp className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Encaissements</p>
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  Encaissements
+                  <InfoTooltip {...DEFINITIONS.encaissements} size="sm" />
+                </p>
                 <p className="text-xl font-bold">{currentMonth.encaissements.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €</p>
               </div>
             </div>

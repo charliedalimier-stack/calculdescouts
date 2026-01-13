@@ -16,18 +16,14 @@ import {
   ComposedChart,
   ReferenceLine,
 } from "recharts";
-import { BarChart3, TrendingUp, AlertCircle, Info } from "lucide-react";
+import { BarChart3, TrendingUp, AlertCircle } from "lucide-react";
 import { useProducts } from "@/hooks/useProducts";
 import { useSales } from "@/hooks/useSales";
 import { useProjectSettings } from "@/hooks/useProjectSettings";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMemo } from "react";
-import {
-  Tooltip as UITooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
+import { DEFINITIONS } from "@/lib/pedagogicDefinitions";
 
 const Analysis = () => {
   const { productsWithCosts, isLoadingWithCosts } = useProducts();
@@ -250,20 +246,12 @@ const Analysis = () => {
           <CardTitle className="flex items-center gap-2 text-base">
             <TrendingUp className="h-5 w-5 text-primary" />
             Dispersion des coefficients
-            <TooltipProvider>
-              <UITooltip>
-                <TooltipTrigger>
-                  <Info className="h-4 w-4 text-muted-foreground" />
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  <p className="font-medium">Coefficient = Prix de vente HT ÷ Coût de production</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Plus le coefficient est élevé, plus la marge est importante. 
-                    Un coefficient de {coefficientCible}x est considéré comme optimal.
-                  </p>
-                </TooltipContent>
-              </UITooltip>
-            </TooltipProvider>
+            <InfoTooltip
+              title={DEFINITIONS.coefficient.title}
+              formula={DEFINITIONS.coefficient.formula}
+              description={DEFINITIONS.coefficient.description}
+              interpretation={DEFINITIONS.coefficient.interpretation}
+            />
             <Badge variant="outline" className="ml-auto text-xs">
               Cible: {coefficientCible}x | Min: {coefficientMin}x
             </Badge>

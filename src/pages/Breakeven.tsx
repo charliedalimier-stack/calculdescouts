@@ -13,7 +13,9 @@ import { useCategories } from "@/hooks/useCategories";
 import { BreakevenChart } from "@/components/breakeven/BreakevenChart";
 import { BreakevenTable } from "@/components/breakeven/BreakevenTable";
 import { BreakevenSummary } from "@/components/breakeven/BreakevenSummary";
-import { Target, Download, Filter, Settings } from "lucide-react";
+import { Target, Download, Settings } from "lucide-react";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
+import { DEFINITIONS } from "@/lib/pedagogicDefinitions";
 
 export default function Breakeven() {
   const { productsWithCosts, isLoading, getAllProductsBreakeven, getProductBreakeven, getBreakevenSummary } = useBreakevenAnalysis();
@@ -123,6 +125,12 @@ export default function Breakeven() {
             <CardTitle className="text-base flex items-center gap-2">
               <Settings className="h-4 w-4" />
               Paramètres de calcul
+              <InfoTooltip
+                title={DEFINITIONS.seuil_rentabilite.title}
+                formula={DEFINITIONS.seuil_rentabilite.formula}
+                description={DEFINITIONS.seuil_rentabilite.description}
+                interpretation={DEFINITIONS.seuil_rentabilite.interpretation}
+              />
             </CardTitle>
           </CardHeader>
           <CardContent>

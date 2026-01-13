@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getYearOptions, getCurrentYear, MONTH_LABELS_FULL } from "@/lib/dateOptions";
+import { DEFINITIONS } from "@/lib/pedagogicDefinitions";
 
 const MONTHS = MONTH_LABELS_FULL.map((label, index) => ({
   value: index + 1,
@@ -174,7 +175,7 @@ const Index = () => {
                 : "Première période"}
               changeType={variationCA >= 0 ? "positive" : "negative"}
               icon={TrendingUp}
-              tooltip={`Total des ventes HT - ${periodLabel}`}
+              pedagogicInfo={DEFINITIONS.ca_ht}
             />
             <KPICard
               title="Marge brute"
@@ -182,7 +183,7 @@ const Index = () => {
               change={synthesis.taux_marge >= 35 ? "Objectif atteint" : "En dessous de l'objectif"}
               changeType={synthesis.taux_marge >= 35 ? "positive" : "negative"}
               icon={CircleDollarSign}
-              tooltip="Marge brute en pourcentage du CA"
+              pedagogicInfo={DEFINITIONS.taux_marge}
             />
             <KPICard
               title="Frais professionnels"
@@ -190,7 +191,7 @@ const Index = () => {
               change={synthesis.ca_ht > 0 ? `${((synthesis.frais_professionnels / synthesis.ca_ht) * 100).toFixed(1)}% du CA` : "Aucun CA"}
               changeType={synthesis.frais_professionnels > synthesis.marge_brute ? "negative" : "neutral"}
               icon={Receipt}
-              tooltip="Frais fixes de la période"
+              pedagogicInfo={DEFINITIONS.frais_professionnels}
             />
             <KPICard
               title="Résultat net"
@@ -198,7 +199,7 @@ const Index = () => {
               change={synthesis.resultat_net >= 0 ? "Rentable" : "Non rentable"}
               changeType={synthesis.resultat_net >= 0 ? "positive" : "negative"}
               icon={synthesis.resultat_net >= 0 ? TrendingUp : AlertTriangle}
-              tooltip="Marge brute - Frais professionnels"
+              pedagogicInfo={DEFINITIONS.resultat_net}
             />
           </>
         )}
@@ -236,7 +237,7 @@ const Index = () => {
               change={synthesis.cash_flow_apres_frais >= 0 ? "Trésorerie positive" : "Tension de trésorerie"}
               changeType={synthesis.cash_flow_apres_frais >= 0 ? "positive" : "negative"}
               icon={Wallet}
-              tooltip="Flux de trésorerie de la période"
+              pedagogicInfo={DEFINITIONS.cash_flow}
             />
             <KPICard
               title="CA TTC"
@@ -244,7 +245,7 @@ const Index = () => {
               change={`TVA: ${(synthesis.ca_ttc - synthesis.ca_ht).toLocaleString("fr-FR")} €`}
               changeType="neutral"
               icon={TrendingUp}
-              tooltip="Chiffre d'affaires toutes taxes comprises"
+              pedagogicInfo={DEFINITIONS.ca_ttc}
             />
           </>
         )}

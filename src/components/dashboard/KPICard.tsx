@@ -1,6 +1,8 @@
 import { LucideIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
+import { PedagogicDefinition } from "@/lib/pedagogicDefinitions";
 
 interface KPICardProps {
   title: string;
@@ -9,6 +11,7 @@ interface KPICardProps {
   changeType?: "positive" | "negative" | "neutral";
   icon: LucideIcon;
   tooltip?: string;
+  pedagogicInfo?: PedagogicDefinition;
 }
 
 export function KPICard({
@@ -18,13 +21,25 @@ export function KPICard({
   changeType = "neutral",
   icon: Icon,
   tooltip,
+  pedagogicInfo,
 }: KPICardProps) {
   return (
-    <Card className="relative overflow-hidden transition-all hover:shadow-md" title={tooltip}>
+    <Card className="relative overflow-hidden transition-all hover:shadow-md" title={!pedagogicInfo ? tooltip : undefined}>
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <p className="text-sm font-medium text-muted-foreground">{title}</p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm font-medium text-muted-foreground">{title}</p>
+              {pedagogicInfo && (
+                <InfoTooltip
+                  title={pedagogicInfo.title}
+                  formula={pedagogicInfo.formula}
+                  description={pedagogicInfo.description}
+                  interpretation={pedagogicInfo.interpretation}
+                  size="sm"
+                />
+              )}
+            </div>
             <p className="mt-2 text-2xl font-bold text-foreground">{value}</p>
             {change && (
               <p

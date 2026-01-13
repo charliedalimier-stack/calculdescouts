@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +17,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { StockInsert } from "@/hooks/useStocks";
+import { getMonthOptions, getCurrentMonth } from "@/lib/dateOptions";
+import { Calendar } from "lucide-react";
 
 interface Ingredient {
   id: string;
@@ -57,9 +59,26 @@ export function AddStockDialog({
     quantite: 0,
     cout_unitaire: 0,
     seuil_alerte: 10,
+    date_initial: getCurrentMonth(),
   });
 
   const [selectedItemId, setSelectedItemId] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (open) {
+      setFormData({
+        type_stock: "ingredient",
+        quantite: 0,
+        cout_unitaire: 0,
+        seuil_alerte: 10,
+        date_initial: getCurrentMonth(),
+      });
+      setSelectedItemId("");
+      setIsSubmitting(false);
+    }
+  }, [open]);
 
   const handleTypeChange = (type: string) => {
     setFormData({
@@ -68,6 +87,7 @@ export function AddStockDialog({
       ingredient_id: null,
       packaging_id: null,
       product_id: null,
+      cout_unitaire: 0,
     });
     setSelectedItemId("");
   };
@@ -82,6 +102,8 @@ export function AddStockDialog({
       setFormData({
         ...formData,
         ingredient_id: id,
+        packaging_id: null,
+        product_id: null,
         cout_unitaire: cost,
       });
     } else if (formData.type_stock === "packaging") {
@@ -90,26 +112,32 @@ export function AddStockDialog({
       setFormData({
         ...formData,
         packaging_id: id,
+        ingredient_id: null,
+        product_id: null,
         cout_unitaire: cost,
       });
     } else {
       setFormData({
         ...formData,
         product_id: id,
+        ingredient_id: null,
+        packaging_id: null,
       });
     }
   };
 
-  const handleSubmit = () => {
-    onSubmit(formData);
-    setFormData({
-      type_stock: "ingredient",
-      quantite: 0,
-      cout_unitaire: 0,
-      seuil_alerte: 10,
-    });
-    setSelectedItemId("");
-    onOpenChange(false);
+  const handleSubmit = async () => {
+    if (isSubmitting || !selectedItemId) return;
+    
+    setIsSubmitting(true);
+    try {
+      await onSubmit(formData);
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Error adding stock:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getItems = () => {
@@ -125,11 +153,17 @@ export function AddStockDialog({
     }
   };
 
+  const items = getItems();
+  const monthOptions = getMonthOptions();
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Ajouter un stock</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Ajouter un stock initial
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div>
@@ -156,66 +190,111 @@ export function AddStockDialog({
                 <SelectValue placeholder="Sélectionner un article" />
               </SelectTrigger>
               <SelectContent>
-                {getItems().map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.name}
+                {items.length === 0 ? (
+                  <SelectItem value="_empty" disabled>
+                    Aucun {formData.type_stock === "ingredient" ? "ingrédient" : formData.type_stock === "packaging" ? "emballage" : "produit"} disponible
+                  </SelectItem>
+                ) : (
+                  items.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.name}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label>Date de stock initial</Label>
+            <Select
+              value={formData.date_initial || getCurrentMonth()}
+              onValueChange={(value) =>
+                setFormData({ ...formData, date_initial: value })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Sélectionner un mois" />
+              </SelectTrigger>
+              <SelectContent>
+                {monthOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          <div>
-            <Label>Quantité initiale</Label>
-            <Input
-              type="number"
-              step="0.01"
-              value={formData.quantite}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  quantite: parseFloat(e.target.value) || 0,
-                })
-              }
-            />
-          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Quantité initiale</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.quantite || ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    quantite: parseFloat(e.target.value) || 0,
+                  })
+                }
+                placeholder="0"
+              />
+            </div>
 
-          <div>
-            <Label>Coût unitaire (€)</Label>
-            <Input
-              type="number"
-              step="0.01"
-              value={formData.cout_unitaire}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  cout_unitaire: parseFloat(e.target.value) || 0,
-                })
-              }
-            />
+            <div>
+              <Label>Coût unitaire (€)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.cout_unitaire || ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    cout_unitaire: parseFloat(e.target.value) || 0,
+                  })
+                }
+                placeholder="0.00"
+              />
+            </div>
           </div>
 
           <div>
             <Label>Seuil d'alerte</Label>
             <Input
               type="number"
-              step="0.01"
-              value={formData.seuil_alerte || 0}
+              step="1"
+              min="0"
+              value={formData.seuil_alerte || ""}
               onChange={(e) =>
                 setFormData({
                   ...formData,
                   seuil_alerte: parseFloat(e.target.value) || 0,
                 })
               }
+              placeholder="10"
             />
+            <p className="text-xs text-muted-foreground mt-1">
+              Vous serez alerté quand le stock passe en dessous de ce seuil
+            </p>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button 
+            variant="outline" 
+            onClick={() => onOpenChange(false)}
+            disabled={isSubmitting}
+          >
             Annuler
           </Button>
-          <Button onClick={handleSubmit} disabled={!selectedItemId}>
-            Ajouter
+          <Button 
+            onClick={handleSubmit} 
+            disabled={!selectedItemId || isSubmitting}
+          >
+            {isSubmitting ? "Ajout..." : "Ajouter"}
           </Button>
         </DialogFooter>
       </DialogContent>

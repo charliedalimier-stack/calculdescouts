@@ -25,6 +25,7 @@ import { useSalesByCategory } from "@/hooks/useSalesByCategory";
 import { AnnualSalesTable } from "@/components/sales/AnnualSalesTable";
 import { SalesByCategoryTable } from "@/components/sales/SalesByCategoryTable";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getMonthOptions, getYearOptions, getCurrentMonth, getCurrentYear } from "@/lib/dateOptions";
 
 type ViewMode = 'monthly' | 'annual' | 'category';
 
@@ -49,30 +50,10 @@ const getEcartBadge = (ecart: number) => {
   );
 };
 
-const getMonthOptions = () => {
-  const options = [];
-  const now = new Date();
-  for (let i = -6; i <= 6; i++) {
-    const date = new Date(now.getFullYear(), now.getMonth() + i, 1);
-    const value = date.toISOString().slice(0, 7) + '-01';
-    const label = date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-    options.push({ value, label });
-  }
-  return options;
-};
-
-const getYearOptions = () => {
-  const currentYear = new Date().getFullYear();
-  return [currentYear - 1, currentYear, currentYear + 1].map(year => ({
-    value: year.toString(),
-    label: year.toString(),
-  }));
-};
-
 const Sales = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('monthly');
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7) + '-01');
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
+  const [selectedYear, setSelectedYear] = useState(getCurrentYear());
   
   const { salesData, totals, isLoading, setSalesTarget, setSalesActual } = useSales(selectedMonth);
   const { annualData, annualTotals, isLoading: isLoadingAnnual, setSalesValue } = useAnnualSales(selectedYear);

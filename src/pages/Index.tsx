@@ -28,27 +28,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { getYearOptions, getCurrentYear, MONTH_LABELS_FULL } from "@/lib/dateOptions";
 
-const MONTHS = [
-  { value: 1, label: "Janvier" },
-  { value: 2, label: "Février" },
-  { value: 3, label: "Mars" },
-  { value: 4, label: "Avril" },
-  { value: 5, label: "Mai" },
-  { value: 6, label: "Juin" },
-  { value: 7, label: "Juillet" },
-  { value: 8, label: "Août" },
-  { value: 9, label: "Septembre" },
-  { value: 10, label: "Octobre" },
-  { value: 11, label: "Novembre" },
-  { value: 12, label: "Décembre" },
-];
+const MONTHS = MONTH_LABELS_FULL.map((label, index) => ({
+  value: index + 1,
+  label,
+}));
 
 const Index = () => {
-  const currentDate = new Date();
   const [periodType, setPeriodType] = useState<'month' | 'year'>('month');
-  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(getCurrentYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
 
   const { products, isLoadingWithCosts } = useProducts();
   const { data: synthesisData, isLoading: isLoadingSynthesis } = useGlobalSynthesis({
@@ -74,11 +64,8 @@ const Index = () => {
     alerts: { resultat_negatif: false, cash_flow_negatif: false, frais_vs_ca: 0 },
   }, [synthesisData]);
 
-  // Generate years list (current year and 2 previous)
-  const years = useMemo(() => {
-    const currentYear = currentDate.getFullYear();
-    return [currentYear, currentYear - 1, currentYear - 2];
-  }, []);
+  // Generate years list (2025-2030)
+  const years = getYearOptions().map(y => parseInt(y.value));
 
   const topCategories = useMemo(() => {
     if (!synthesis.par_categorie) return [];

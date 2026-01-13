@@ -53,9 +53,10 @@ export function BCGMatrix() {
     const productData = productsWithCosts
       .filter((p) => p.margin !== null && p.margin !== undefined)
       .map((p) => ({
+        id: p.id,
         name: p.nom_produit,
         rentabilite: Number((p.margin || 0).toFixed(1)),
-        volume: volumeMap[p.id] || Math.floor(Math.random() * 800) + 100, // Fallback for demo
+        volume: volumeMap[p.id] || 0, // Use 0 if no sales data, no random fallback
         quadrant: "", // Will be calculated after averages
       }));
 
@@ -68,7 +69,7 @@ export function BCGMatrix() {
     const avgM = totalMargin / productData.length;
     const avgV = totalVolume / productData.length;
     const maxM = Math.max(...productData.map((p) => p.rentabilite), 60);
-    const maxV = Math.max(...productData.map((p) => p.volume), 1000);
+    const maxV = Math.max(...productData.map((p) => p.volume), 100);
 
     const productsWithQuadrants = productData.map((p) => ({
       ...p,

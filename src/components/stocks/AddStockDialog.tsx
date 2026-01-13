@@ -17,8 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { StockInsert } from "@/hooks/useStocks";
-import { getMonthOptions, getCurrentMonth } from "@/lib/dateOptions";
-import { Calendar } from "lucide-react";
+import { Package } from "lucide-react";
 
 interface Ingredient {
   id: string;
@@ -59,7 +58,6 @@ export function AddStockDialog({
     quantite: 0,
     cout_unitaire: 0,
     seuil_alerte: 10,
-    date_initial: getCurrentMonth(),
   });
 
   const [selectedItemId, setSelectedItemId] = useState("");
@@ -73,7 +71,6 @@ export function AddStockDialog({
         quantite: 0,
         cout_unitaire: 0,
         seuil_alerte: 10,
-        date_initial: getCurrentMonth(),
       });
       setSelectedItemId("");
       setIsSubmitting(false);
@@ -154,14 +151,13 @@ export function AddStockDialog({
   };
 
   const items = getItems();
-  const monthOptions = getMonthOptions();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
+            <Package className="h-5 w-5" />
             Ajouter un stock initial
           </DialogTitle>
         </DialogHeader>
@@ -205,26 +201,6 @@ export function AddStockDialog({
             </Select>
           </div>
 
-          <div>
-            <Label>Date de stock initial</Label>
-            <Select
-              value={formData.date_initial || getCurrentMonth()}
-              onValueChange={(value) =>
-                setFormData({ ...formData, date_initial: value })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Sélectionner un mois" />
-              </SelectTrigger>
-              <SelectContent>
-                {monthOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>

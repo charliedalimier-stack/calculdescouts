@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Package, Apple, Box, Calculator, TrendingUp, Wallet, BarChart3, Target, FolderOpen, FileText, Settings, Activity, Crosshair, ShieldAlert, Warehouse, Receipt, Globe, Briefcase, LogOut, User, Scale, Slack } from "lucide-react";
+import { LayoutDashboard, Package, Apple, Box, ChefHat, Calculator, TrendingUp, Wallet, BarChart3, Target, FolderOpen, FileText, Settings, Activity, Crosshair, ShieldAlert, Warehouse, Receipt, Globe, Briefcase, LogOut, User, Scale } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -132,8 +132,8 @@ export function AppSidebar() {
   return <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <Link to="/" className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#16da9f]">
-            <Slack className="h-5 w-5 text-primary-foreground" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
+            <ChefHat className="h-5 w-5 text-primary-foreground" />
           </div>
           <div className="flex flex-col">
             <span className="font-semibold text-sidebar-foreground">

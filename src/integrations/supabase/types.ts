@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      annual_sales: {
+        Row: {
+          categorie_prix: string
+          created_at: string
+          id: string
+          mode: string
+          prix_ht_override: number | null
+          product_id: string
+          project_id: string
+          quantite_annuelle: number
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          categorie_prix?: string
+          created_at?: string
+          id?: string
+          mode?: string
+          prix_ht_override?: number | null
+          product_id: string
+          project_id: string
+          quantite_annuelle?: number
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          categorie_prix?: string
+          created_at?: string
+          id?: string
+          mode?: string
+          prix_ht_override?: number | null
+          product_id?: string
+          project_id?: string
+          quantite_annuelle?: number
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "annual_sales_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "annual_sales_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       breakeven_analysis: {
         Row: {
           ca_minimum: number | null
@@ -897,6 +951,77 @@ export type Database = {
           },
           {
             foreignKeyName: "sales_targets_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seasonality_coefficients: {
+        Row: {
+          created_at: string
+          id: string
+          mode: string
+          month_01: number
+          month_02: number
+          month_03: number
+          month_04: number
+          month_05: number
+          month_06: number
+          month_07: number
+          month_08: number
+          month_09: number
+          month_10: number
+          month_11: number
+          month_12: number
+          project_id: string
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mode?: string
+          month_01?: number
+          month_02?: number
+          month_03?: number
+          month_04?: number
+          month_05?: number
+          month_06?: number
+          month_07?: number
+          month_08?: number
+          month_09?: number
+          month_10?: number
+          month_11?: number
+          month_12?: number
+          project_id: string
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mode?: string
+          month_01?: number
+          month_02?: number
+          month_03?: number
+          month_04?: number
+          month_05?: number
+          month_06?: number
+          month_07?: number
+          month_08?: number
+          month_09?: number
+          month_10?: number
+          month_11?: number
+          month_12?: number
+          project_id?: string
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seasonality_coefficients_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"

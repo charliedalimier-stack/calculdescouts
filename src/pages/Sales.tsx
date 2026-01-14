@@ -1,17 +1,7 @@
 import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
@@ -19,106 +9,46 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { TrendingUp, TrendingDown, Target, BarChart3, Calendar, CalendarRange, Tags } from "lucide-react";
-import { useSales, useAnnualSales } from "@/hooks/useSales";
-import { useSalesByCategory } from "@/hooks/useSalesByCategory";
-import { AnnualSalesTable } from "@/components/sales/AnnualSalesTable";
-import { SalesByCategoryTable } from "@/components/sales/SalesByCategoryTable";
+import { TrendingUp, TrendingDown, Target, BarChart3, Calendar, Edit3, Eye } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getMonthOptions, getYearOptions, getCurrentMonth, getCurrentYear } from "@/lib/dateOptions";
+import { getYearOptions, getCurrentYear } from "@/lib/dateOptions";
+import { 
+  useSeasonalityCoefficients, 
+  useAnnualSalesEntry, 
+  useMonthlyDistribution 
+} from "@/hooks/useAnnualSalesEntry";
+import { AnnualEntryTable } from "@/components/sales/AnnualEntryTable";
+import { SeasonalityEditor } from "@/components/sales/SeasonalityEditor";
+import { MonthlyViewTable } from "@/components/sales/MonthlyViewTable";
+import { ObjectivesComparisonTable } from "@/components/sales/ObjectivesComparisonTable";
+import { SalesCharts } from "@/components/sales/SalesCharts";
 
-type ViewMode = 'monthly' | 'annual' | 'category';
-
-const getEcartBadge = (ecart: number) => {
-  if (ecart > 0) {
-    return (
-      <Badge className="bg-primary/10 text-primary border-primary/20">
-        +{ecart.toFixed(1)}%
-      </Badge>
-    );
-  } else if (ecart >= -5) {
-    return (
-      <Badge className="bg-chart-4/10 text-chart-4 border-chart-4/20">
-        {ecart.toFixed(1)}%
-      </Badge>
-    );
-  }
-  return (
-    <Badge className="bg-destructive/10 text-destructive border-destructive/20">
-      {ecart.toFixed(1)}%
-    </Badge>
-  );
-};
+type ViewMode = 'entry' | 'monthly' | 'comparison';
+type DataMode = 'budget' | 'reel';
 
 const Sales = () => {
-  const [viewMode, setViewMode] = useState<ViewMode>('monthly');
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
+  const [viewMode, setViewMode] = useState<ViewMode>('entry');
+  const [dataMode, setDataMode] = useState<DataMode>('budget');
   const [selectedYear, setSelectedYear] = useState(getCurrentYear());
-  
-  const { salesData, totals, isLoading, setSalesTarget, setSalesActual } = useSales(selectedMonth);
-  const { annualData, annualTotals, isLoading: isLoadingAnnual, setSalesValue } = useAnnualSales(selectedYear);
-  const { totals: categoryTotals, isLoading: isLoadingCategory } = useSalesByCategory(selectedMonth);
-  
-  const [editingCell, setEditingCell] = useState<{ productId: string; field: 'objectif' | 'reel' } | null>(null);
-  const [editValue, setEditValue] = useState('');
 
-  const monthOptions = getMonthOptions();
   const yearOptions = getYearOptions();
 
-  const handleEdit = (productId: string, field: 'objectif' | 'reel', currentValue: number) => {
-    setEditingCell({ productId, field });
-    setEditValue(currentValue.toString());
-  };
+  // Hooks
+  const { coefficients, isLoading: loadingCoefs, updateCoefficients } = useSeasonalityCoefficients(selectedYear, dataMode);
+  const { entries, totals: entryTotals, isLoading: loadingEntries, setAnnualSales } = useAnnualSalesEntry(selectedYear, dataMode);
+  const { monthly, byChannel, totals: monthlyTotals, isLoading: loadingMonthly } = useMonthlyDistribution(selectedYear);
 
-  const handleSave = () => {
-    if (!editingCell) return;
-    
-    const value = parseFloat(editValue) || 0;
-    
-    if (editingCell.field === 'objectif') {
-      setSalesTarget.mutate({
-        product_id: editingCell.productId,
-        mois: selectedMonth,
-        quantite_objectif: value,
-      });
-    } else {
-      setSalesActual.mutate({
-        product_id: editingCell.productId,
-        mois: selectedMonth,
-        quantite_reelle: value,
-      });
-    }
-    
-    setEditingCell(null);
-  };
+  const isLoading = loadingCoefs || loadingEntries || loadingMonthly;
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleSave();
-    if (e.key === 'Escape') setEditingCell(null);
-  };
+  // Summary KPIs
+  const budgetCa = monthlyTotals.budget_ca;
+  const reelCa = monthlyTotals.reel_ca;
+  const ecartCa = monthlyTotals.ecart_ca;
+  const ecartPercent = monthlyTotals.ecart_percent;
 
-  const handleAnnualCellChange = (productId: string, month: string, field: 'objectif' | 'reel', value: number) => {
-    setSalesValue.mutate({ product_id: productId, mois: month, field, value });
-  };
-
-  // Determine which totals to display based on view mode
-  const displayTotals = viewMode === 'annual' 
-    ? annualTotals 
-    : viewMode === 'category' 
-      ? { 
-          objectif_ca: categoryTotals.target_ca, 
-          reel_ca: categoryTotals.actual_ca, 
-          ecart_ca: categoryTotals.actual_ca - categoryTotals.target_ca,
-          ecart_percent: categoryTotals.target_ca > 0 
-            ? ((categoryTotals.actual_ca - categoryTotals.target_ca) / categoryTotals.target_ca) * 100 
-            : 0,
-        }
-      : totals;
-  const currentIsLoading = viewMode === 'monthly' ? isLoading : viewMode === 'annual' ? isLoadingAnnual : isLoadingCategory;
-
-  if (currentIsLoading) {
+  if (isLoading && entries.length === 0) {
     return (
-      <AppLayout title="Suivi des ventes" subtitle="Comparez vos objectifs aux résultats réels">
+      <AppLayout title="Ventes" subtitle="Saisie annuelle → Lecture mensuelle">
         <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[...Array(4)].map((_, i) => (
             <Card key={i}>
@@ -128,67 +58,66 @@ const Sales = () => {
             </Card>
           ))}
         </div>
-        <Card>
-          <CardContent className="p-6">
-            <Skeleton className="h-64 w-full" />
-          </CardContent>
-        </Card>
+        <Skeleton className="h-64 w-full" />
       </AppLayout>
     );
   }
 
   return (
     <AppLayout
-      title="Suivi des ventes"
-      subtitle="Comparez vos objectifs aux résultats réels"
+      title="Ventes"
+      subtitle="Saisie annuelle → Lecture mensuelle"
     >
-      {/* View Toggle & Period Selector */}
+      {/* Selectors Row */}
       <div className="mb-6 flex flex-wrap items-center gap-4">
-        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+        {/* Year Selector */}
+        <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
+          <SelectTrigger className="w-32">
+            <Calendar className="h-4 w-4 mr-2" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {yearOptions.map(option => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Mode Selector */}
+        <Tabs value={dataMode} onValueChange={(v) => setDataMode(v as DataMode)}>
           <TabsList>
-            <TabsTrigger value="monthly" className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Mensuelle
+            <TabsTrigger value="budget" className="flex items-center gap-2">
+              <Target className="h-4 w-4" />
+              Budget
             </TabsTrigger>
-            <TabsTrigger value="category" className="flex items-center gap-2">
-              <Tags className="h-4 w-4" />
-              Par canal
-            </TabsTrigger>
-            <TabsTrigger value="annual" className="flex items-center gap-2">
-              <CalendarRange className="h-4 w-4" />
-              Annuelle
+            <TabsTrigger value="reel" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Réel
             </TabsTrigger>
           </TabsList>
         </Tabs>
 
-        {(viewMode === 'monthly' || viewMode === 'category') && (
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-64">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {monthOptions.map(option => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-        {viewMode === 'annual' && (
-          <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {yearOptions.map(option => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+        <div className="flex-1" />
+
+        {/* View Selector */}
+        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+          <TabsList>
+            <TabsTrigger value="entry" className="flex items-center gap-2">
+              <Edit3 className="h-4 w-4" />
+              Saisie
+            </TabsTrigger>
+            <TabsTrigger value="monthly" className="flex items-center gap-2">
+              <Eye className="h-4 w-4" />
+              Mensuel
+            </TabsTrigger>
+            <TabsTrigger value="comparison" className="flex items-center gap-2">
+              <Target className="h-4 w-4" />
+              Objectifs
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       {/* Summary Cards */}
@@ -200,11 +129,9 @@ const Sales = () => {
                 <Target className="h-5 w-5 text-accent-foreground" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">
-                  CA Objectif {viewMode === 'annual' ? selectedYear : ''}
-                </p>
+                <p className="text-sm text-muted-foreground">CA Budget {selectedYear}</p>
                 <p className="text-xl font-bold">
-                  {displayTotals.objectif_ca.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
+                  {budgetCa.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
                 </p>
               </div>
             </div>
@@ -218,11 +145,9 @@ const Sales = () => {
                 <BarChart3 className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">
-                  CA Réel {viewMode === 'annual' ? selectedYear : ''}
-                </p>
+                <p className="text-sm text-muted-foreground">CA Réel {selectedYear}</p>
                 <p className="text-xl font-bold">
-                  {displayTotals.reel_ca.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
+                  {reelCa.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
                 </p>
               </div>
             </div>
@@ -233,9 +158,9 @@ const Sales = () => {
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                displayTotals.ecart_ca >= 0 ? "bg-primary/10" : "bg-destructive/10"
+                ecartCa >= 0 ? "bg-primary/10" : "bg-destructive/10"
               }`}>
-                {displayTotals.ecart_ca >= 0 ? (
+                {ecartCa >= 0 ? (
                   <TrendingUp className="h-5 w-5 text-primary" />
                 ) : (
                   <TrendingDown className="h-5 w-5 text-destructive" />
@@ -243,8 +168,8 @@ const Sales = () => {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Écart CA</p>
-                <p className={`text-xl font-bold ${displayTotals.ecart_ca >= 0 ? "text-primary" : "text-destructive"}`}>
-                  {displayTotals.ecart_ca >= 0 ? "+" : ""}{displayTotals.ecart_ca.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
+                <p className={`text-xl font-bold ${ecartCa >= 0 ? "text-primary" : "text-destructive"}`}>
+                  {ecartCa >= 0 ? "+" : ""}{ecartCa.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
                 </p>
               </div>
             </div>
@@ -255,9 +180,9 @@ const Sales = () => {
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                displayTotals.ecart_percent >= 0 ? "bg-primary/10" : "bg-destructive/10"
+                ecartPercent >= 0 ? "bg-primary/10" : "bg-destructive/10"
               }`}>
-                {displayTotals.ecart_percent >= 0 ? (
+                {ecartPercent >= 0 ? (
                   <TrendingUp className="h-5 w-5 text-primary" />
                 ) : (
                   <TrendingDown className="h-5 w-5 text-destructive" />
@@ -265,8 +190,8 @@ const Sales = () => {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Performance</p>
-                <p className={`text-xl font-bold ${displayTotals.ecart_percent >= 0 ? "text-primary" : "text-destructive"}`}>
-                  {displayTotals.ecart_percent >= 0 ? "+" : ""}{displayTotals.ecart_percent.toFixed(1)}%
+                <p className={`text-xl font-bold ${ecartPercent >= 0 ? "text-primary" : "text-destructive"}`}>
+                  {ecartPercent >= 0 ? "+" : ""}{ecartPercent.toFixed(1)}%
                 </p>
               </div>
             </div>
@@ -274,134 +199,50 @@ const Sales = () => {
         </Card>
       </div>
 
-      {/* Monthly View */}
-      {viewMode === 'monthly' && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base font-semibold">
-              Détail par produit
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {salesData.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground">
-                Aucun produit trouvé. Créez des produits pour commencer le suivi des ventes.
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Produit</TableHead>
-                    <TableHead>Catégorie</TableHead>
-                    <TableHead className="text-right">Obj. Qté</TableHead>
-                    <TableHead className="text-right">Réel Qté</TableHead>
-                    <TableHead className="text-right">Obj. CA</TableHead>
-                    <TableHead className="text-right">Réel CA</TableHead>
-                    <TableHead className="text-right">Écart CA</TableHead>
-                    <TableHead className="text-center">Performance</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {salesData.map((row) => (
-                    <TableRow key={row.product_id}>
-                      <TableCell className="font-medium">{row.product_name}</TableCell>
-                      <TableCell>
-                        {row.category_name ? (
-                          <Badge variant="outline">{row.category_name}</Badge>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {editingCell?.productId === row.product_id && editingCell.field === 'objectif' ? (
-                          <Input
-                            type="number"
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            onBlur={handleSave}
-                            onKeyDown={handleKeyDown}
-                            className="w-20 h-8"
-                            autoFocus
-                          />
-                        ) : (
-                          <button
-                            className="text-muted-foreground hover:text-foreground hover:underline"
-                            onClick={() => handleEdit(row.product_id, 'objectif', row.objectif_qty)}
-                          >
-                            {row.objectif_qty}
-                          </button>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {editingCell?.productId === row.product_id && editingCell.field === 'reel' ? (
-                          <Input
-                            type="number"
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            onBlur={handleSave}
-                            onKeyDown={handleKeyDown}
-                            className="w-20 h-8"
-                            autoFocus
-                          />
-                        ) : (
-                          <button
-                            className="hover:text-primary hover:underline"
-                            onClick={() => handleEdit(row.product_id, 'reel', row.reel_qty)}
-                          >
-                            {row.reel_qty}
-                          </button>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {row.objectif_ca.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {row.reel_ca.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
-                      </TableCell>
-                      <TableCell className={`text-right ${row.ecart_ca >= 0 ? "text-primary" : "text-destructive"}`}>
-                        {row.ecart_ca >= 0 ? "+" : ""}{row.ecart_ca.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {getEcartBadge(row.ecart_percent)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  <TableRow className="bg-accent/50 font-semibold">
-                    <TableCell colSpan={4}>Total</TableCell>
-                    <TableCell className="text-right">
-                      {totals.objectif_ca.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {totals.reel_ca.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
-                    </TableCell>
-                    <TableCell className={`text-right ${totals.ecart_ca >= 0 ? "text-primary" : "text-destructive"}`}>
-                      {totals.ecart_ca >= 0 ? "+" : ""}{totals.ecart_ca.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {getEcartBadge(totals.ecart_percent)}
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      {/* Main Content */}
+      <div className="space-y-6">
+        {/* Entry View */}
+        {viewMode === 'entry' && (
+          <>
+            <SeasonalityEditor
+              coefficients={coefficients}
+              mode={dataMode}
+              onUpdate={(c) => updateCoefficients.mutate(c)}
+              isLoading={loadingCoefs}
+            />
+            <AnnualEntryTable
+              entries={entries}
+              totals={entryTotals}
+              isLoading={loadingEntries}
+              mode={dataMode}
+              onUpdate={(params) => setAnnualSales.mutate(params)}
+            />
+          </>
+        )}
 
-      {/* Category View */}
-      {viewMode === 'category' && (
-        <SalesByCategoryTable month={selectedMonth} />
-      )}
+        {/* Monthly View */}
+        {viewMode === 'monthly' && (
+          <>
+            <MonthlyViewTable
+              monthly={monthly}
+              totals={monthlyTotals}
+              isLoading={loadingMonthly}
+            />
+            <SalesCharts monthly={monthly} byChannel={byChannel} />
+          </>
+        )}
 
-      {/* Annual View */}
-      {viewMode === 'annual' && (
-        <AnnualSalesTable
-          year={selectedYear}
-          data={annualData}
-          onCellChange={handleAnnualCellChange}
-          isLoading={isLoadingAnnual}
-        />
-      )}
+        {/* Comparison View */}
+        {viewMode === 'comparison' && (
+          <>
+            <ObjectivesComparisonTable
+              monthly={monthly}
+              totals={monthlyTotals}
+            />
+            <SalesCharts monthly={monthly} byChannel={byChannel} />
+          </>
+        )}
+      </div>
     </AppLayout>
   );
 };

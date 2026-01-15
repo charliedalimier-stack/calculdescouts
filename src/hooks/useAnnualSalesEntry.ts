@@ -174,24 +174,28 @@ export function useAnnualSalesEntry(year: number, mode: 'budget' | 'reel') {
     queryFn: async () => {
       if (!currentProject?.id) return { entries: [], products: [] };
 
-      // Fetch products
+      // Fetch products - products use 'simulation' for budget mode, 'reel' for actual
+      // Products are shared between budget and actual - we fetch simulation mode products
+      // as the canonical product list
+      const productMode = 'simulation';
+      
       const { data: products, error: productsError } = await supabase
         .from('products')
         .select('id, nom_produit, prix_btc, tva_taux, categories(nom_categorie)')
         .eq('project_id', currentProject.id)
-        .eq('mode', mode === 'budget' ? 'budget' : 'reel');
+        .eq('mode', productMode);
 
       if (productsError) throw productsError;
       if (!products || products.length === 0) return { entries: [], products: [] };
 
       const productIds = products.map(p => p.id);
 
-      // Fetch product prices
+      // Fetch product prices - use simulation mode as the base prices
       const { data: productPrices } = await supabase
         .from('product_prices')
         .select('*')
         .in('product_id', productIds)
-        .eq('mode', mode === 'budget' ? 'budget' : 'reel');
+        .eq('mode', 'simulation');
 
       // Fetch annual sales entries
       const { data: annualSales } = await supabase
@@ -360,11 +364,12 @@ export function useMonthlyDistribution(year: number) {
       const { data: prices } = await supabase
         .from('product_prices')
         .select('*')
-        .in('product_id', productIds);
+        .in('product_id', productIds)
+        .eq('mode', 'simulation'); // Use simulation mode for base prices
 
-      const getPrice = (productId: string, category: string, mode: string): number => {
+      const getPrice = (productId: string, category: string): number => {
         const price = (prices || []).find(
-          p => p.product_id === productId && p.categorie_prix === category && p.mode === mode
+          p => p.product_id === productId && p.categorie_prix === category
         );
         if (price) return Number(price.prix_ht);
         
@@ -392,14 +397,14 @@ export function useMonthlyDistribution(year: number) {
 
         (budgetSales || []).forEach(sale => {
           const qty = Math.round(sale.quantite_annuelle * budgetCoef);
-          const prix = sale.prix_ht_override ? Number(sale.prix_ht_override) : getPrice(sale.product_id, sale.categorie_prix, 'budget');
+          const prix = sale.prix_ht_override ? Number(sale.prix_ht_override) : getPrice(sale.product_id, sale.categorie_prix);
           budgetQty += qty;
           budgetCa += qty * prix;
         });
 
         (reelSales || []).forEach(sale => {
           const qty = Math.round(sale.quantite_annuelle * reelCoef);
-          const prix = sale.prix_ht_override ? Number(sale.prix_ht_override) : getPrice(sale.product_id, sale.categorie_prix, 'reel');
+          const prix = sale.prix_ht_override ? Number(sale.prix_ht_override) : getPrice(sale.product_id, sale.categorie_prix);
           reelQty += qty;
           reelCa += qty * prix;
         });
@@ -431,12 +436,12 @@ export function useMonthlyDistribution(year: number) {
         const reelQty = reelEntries.reduce((sum, s) => sum + s.quantite_annuelle, 0);
         
         const budgetCa = budgetEntries.reduce((sum, s) => {
-          const prix = s.prix_ht_override ? Number(s.prix_ht_override) : getPrice(s.product_id, cat, 'budget');
+          const prix = s.prix_ht_override ? Number(s.prix_ht_override) : getPrice(s.product_id, cat);
           return sum + s.quantite_annuelle * prix;
         }, 0);
         
         const reelCa = reelEntries.reduce((sum, s) => {
-          const prix = s.prix_ht_override ? Number(s.prix_ht_override) : getPrice(s.product_id, cat, 'reel');
+          const prix = s.prix_ht_override ? Number(s.prix_ht_override) : getPrice(s.product_id, cat);
           return sum + s.quantite_annuelle * prix;
         }, 0);
 

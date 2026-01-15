@@ -11,8 +11,10 @@ export interface CashFlowEntry {
   decaissements: number;
   delai_paiement_jours: number;
   notes: string | null;
+  mode: string;
   created_at: string;
   updated_at: string;
+  // Note: tva_collectee and tva_deductible are in DB but we don't insert them manually
 }
 
 export interface CashFlowData {
@@ -77,12 +79,26 @@ export function useCashFlow() {
   const hasNegativeCashFlow = cashFlowData.some(d => d.cumul < 0);
 
   const addCashFlowEntry = useMutation({
-    mutationFn: async (entry: Omit<CashFlowEntry, 'id' | 'project_id' | 'created_at' | 'updated_at'>) => {
+    mutationFn: async (entry: {
+      mois: string;
+      encaissements: number;
+      decaissements: number;
+      delai_paiement_jours: number;
+      notes?: string | null;
+    }) => {
       if (!currentProject?.id) throw new Error('Aucun projet sélectionné');
       
+      // Only insert source fields - no computed fields like tva_collectee/tva_deductible
       const { data, error } = await supabase
         .from('cash_flow')
-        .insert({ ...entry, project_id: currentProject.id })
+        .insert({
+          project_id: currentProject.id,
+          mois: entry.mois,
+          encaissements: entry.encaissements,
+          decaissements: entry.decaissements,
+          delai_paiement_jours: entry.delai_paiement_jours,
+          notes: entry.notes || null,
+        })
         .select()
         .single();
       

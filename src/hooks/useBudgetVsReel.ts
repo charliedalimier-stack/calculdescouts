@@ -2,6 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '@/contexts/ProjectContext';
 
+// Default seasonality coefficients (equal distribution)
+const DEFAULT_COEFFICIENTS = [8.33, 8.33, 8.33, 8.33, 8.33, 8.33, 8.33, 8.33, 8.33, 8.33, 8.33, 8.37];
+
 export interface BudgetVsReelIndicator {
   indicator: string;
   budget: number;
@@ -91,30 +94,137 @@ export function useBudgetVsReel({ periodType, year, month }: UseBudgetVsReelPara
       const tvaVente = settings?.tva_vente || 5.5;
       const tvaAchat = settings?.tva_achat || 20;
 
-      // Fetch budget (simulation mode) sales targets
-      const { data: budgetSales } = await supabase
-        .from('sales_targets')
-        .select('*, categorie_prix')
+      // Fetch annual sales for budget and reel modes
+      const { data: budgetAnnualSales } = await supabase
+        .from('annual_sales')
+        .select('*')
         .eq('project_id', projectId)
-        .eq('mode', 'simulation')
-        .gte('mois', startDate)
-        .lte('mois', endDate);
+        .eq('mode', 'budget')
+        .eq('year', year);
 
-      // Fetch real sales actuals
-      const { data: reelSales } = await supabase
-        .from('sales_actuals')
-        .select('*, categorie_prix')
+      const { data: reelAnnualSales } = await supabase
+        .from('annual_sales')
+        .select('*')
         .eq('project_id', projectId)
         .eq('mode', 'reel')
-        .gte('mois', startDate)
-        .lte('mois', endDate);
+        .eq('year', year);
+
+      // Fetch seasonality coefficients
+      const { data: budgetSeasonality } = await supabase
+        .from('seasonality_coefficients')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('mode', 'budget')
+        .eq('year', year)
+        .maybeSingle();
+
+      const { data: reelSeasonality } = await supabase
+        .from('seasonality_coefficients')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('mode', 'reel')
+        .eq('year', year)
+        .maybeSingle();
+
+      // Helper to get coefficient for a month
+      const getCoef = (seasonality: typeof budgetSeasonality, monthIndex: number): number => {
+        if (!seasonality) return DEFAULT_COEFFICIENTS[monthIndex] / 100;
+        const key = `month_${(monthIndex + 1).toString().padStart(2, '0')}` as keyof typeof seasonality;
+        return (Number(seasonality[key]) || DEFAULT_COEFFICIENTS[monthIndex]) / 100;
+      };
+
+      // Convert annual sales to monthly entries for comparison
+      interface SaleEntry {
+        product_id: string;
+        categorie_prix: string;
+        quantity: number;
+        mois: string;
+      }
+
+      const convertAnnualToMonthly = (
+        annualSales: typeof budgetAnnualSales,
+        seasonality: typeof budgetSeasonality
+      ): SaleEntry[] => {
+        const entries: SaleEntry[] = [];
+        (annualSales || []).forEach(annual => {
+          if (periodType === 'month' && month) {
+            const coef = getCoef(seasonality, month - 1);
+            const qty = Math.round(annual.quantite_annuelle * coef);
+            if (qty > 0) {
+              entries.push({
+                product_id: annual.product_id,
+                categorie_prix: annual.categorie_prix,
+                quantity: qty,
+                mois: startDate,
+              });
+            }
+          } else {
+            for (let m = 0; m < 12; m++) {
+              const coef = getCoef(seasonality, m);
+              const qty = Math.round(annual.quantite_annuelle * coef);
+              if (qty > 0) {
+                const monthStr = `${year}-${(m + 1).toString().padStart(2, '0')}-01`;
+                entries.push({
+                  product_id: annual.product_id,
+                  categorie_prix: annual.categorie_prix,
+                  quantity: qty,
+                  mois: monthStr,
+                });
+              }
+            }
+          }
+        });
+        return entries;
+      };
+
+      let budgetSales = convertAnnualToMonthly(budgetAnnualSales, budgetSeasonality);
+      let reelSales = convertAnnualToMonthly(reelAnnualSales, reelSeasonality);
+
+      // Fallback to old system if no annual sales data
+      if (budgetSales.length === 0) {
+        const { data: oldBudgetSales } = await supabase
+          .from('sales_targets')
+          .select('*, categorie_prix')
+          .eq('project_id', projectId)
+          .eq('mode', 'simulation')
+          .gte('mois', startDate)
+          .lte('mois', endDate);
+
+        (oldBudgetSales || []).forEach(s => {
+          budgetSales.push({
+            product_id: s.product_id,
+            categorie_prix: s.categorie_prix || 'BTC',
+            quantity: Number(s.quantite_objectif || 0),
+            mois: s.mois,
+          });
+        });
+      }
+
+      if (reelSales.length === 0) {
+        const { data: oldReelSales } = await supabase
+          .from('sales_actuals')
+          .select('*, categorie_prix')
+          .eq('project_id', projectId)
+          .eq('mode', 'reel')
+          .gte('mois', startDate)
+          .lte('mois', endDate);
+
+        (oldReelSales || []).forEach(s => {
+          reelSales.push({
+            product_id: s.product_id,
+            categorie_prix: s.categorie_prix || 'BTC',
+            quantity: Number(s.quantite_reelle || 0),
+            mois: s.mois,
+          });
+        });
+      }
 
       // Fetch product prices for both modes
       const { data: budgetPrices } = await supabase
         .from('product_prices')
         .select('*')
         .in('product_id', products.map(p => p.id))
-        .eq('mode', 'simulation');
+        .eq('mode', 'budget');
 
       const { data: reelPrices } = await supabase
         .from('product_prices')
@@ -127,7 +237,7 @@ export function useBudgetVsReel({ periodType, year, month }: UseBudgetVsReelPara
         .from('professional_expenses')
         .select('*')
         .eq('project_id', projectId)
-        .eq('mode', 'simulation')
+        .eq('mode', 'budget')
         .gte('mois', startDate)
         .lte('mois', endDate);
 
@@ -139,7 +249,7 @@ export function useBudgetVsReel({ periodType, year, month }: UseBudgetVsReelPara
         .gte('mois', startDate)
         .lte('mois', endDate);
 
-      // Fetch recipes for cost calculation (use simulation for budget costs)
+      // Fetch recipes for cost calculation
       const { data: recipes } = await supabase
         .from('recipes')
         .select('product_id, quantite_utilisee, ingredients(cout_unitaire, tva_taux), mode');
@@ -196,7 +306,7 @@ export function useBudgetVsReel({ periodType, year, month }: UseBudgetVsReelPara
         return costs;
       };
 
-      const budgetCosts = calculateProductCosts('simulation');
+      const budgetCosts = calculateProductCosts('budget');
       const reelCosts = calculateProductCosts('reel');
 
       // Build price lookup
@@ -212,10 +322,9 @@ export function useBudgetVsReel({ periodType, year, month }: UseBudgetVsReelPara
       const budgetPriceMap = buildPriceMap(budgetPrices || []);
       const reelPriceMap = buildPriceMap(reelPrices || []);
 
-      // Aggregate data
+      // Aggregate data - updated to work with SaleEntry format
       const aggregateData = (
-        sales: any[],
-        qtyField: string,
+        sales: SaleEntry[],
         priceMap: { [key: string]: number },
         costs: { [productId: string]: { cost: number; tvaDed: number } }
       ) => {
@@ -229,11 +338,11 @@ export function useBudgetVsReel({ periodType, year, month }: UseBudgetVsReelPara
         const byCategory: { [id: string]: { name: string; ca: number; marge: number } } = {};
         const byMonth: { [m: string]: { ca: number; marge: number } } = {};
 
-        (sales || []).forEach(sale => {
+        sales.forEach(sale => {
           const product = products.find(p => p.id === sale.product_id);
           if (!product) return;
 
-          const qty = Number(sale[qtyField] || 0);
+          const qty = sale.quantity;
           if (qty === 0) return;
 
           const categoriePrix = sale.categorie_prix || 'BTC';
@@ -295,8 +404,8 @@ export function useBudgetVsReel({ periodType, year, month }: UseBudgetVsReelPara
         };
       };
 
-      const budget = aggregateData(budgetSales || [], 'quantite_objectif', budgetPriceMap, budgetCosts);
-      const reel = aggregateData(reelSales || [], 'quantite_reelle', reelPriceMap, reelCosts);
+      const budget = aggregateData(budgetSales, budgetPriceMap, budgetCosts);
+      const reel = aggregateData(reelSales, reelPriceMap, reelCosts);
 
       // Calculate expenses
       const budgetFrais = (budgetExpenses || []).reduce((sum, e) => sum + Number(e.montant_ht), 0);

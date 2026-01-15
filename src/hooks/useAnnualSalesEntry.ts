@@ -7,6 +7,7 @@ import { PriceCategory } from "./useProductPrices";
 export interface SeasonalityCoefficients {
   id?: string;
   project_id: string;
+  user_id?: string;
   mode: string;
   year: number;
   month_01: number;
@@ -26,6 +27,7 @@ export interface SeasonalityCoefficients {
 export interface AnnualSalesEntry {
   id?: string;
   project_id: string;
+  user_id?: string;
   product_id: string;
   mode: string;
   year: number;
@@ -98,6 +100,9 @@ const DEFAULT_COEFFICIENTS = {
   month_12: 8.37,
 };
 
+// --------------------------
+// Hook: Seasonality Coefficients
+// --------------------------
 export function useSeasonalityCoefficients(year: number, mode: "budget" | "reel") {
   const { currentProject } = useProject();
   const queryClient = useQueryClient();
@@ -107,10 +112,16 @@ export function useSeasonalityCoefficients(year: number, mode: "budget" | "reel"
     queryFn: async () => {
       if (!currentProject?.id) return DEFAULT_COEFFICIENTS;
 
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Utilisateur non connecté");
+
       const { data, error } = await supabase
         .from("seasonality_coefficients")
         .select("*")
         .eq("project_id", currentProject.id)
+        .eq("user_id", user.id)
         .eq("year", year)
         .eq("mode", mode)
         .maybeSingle();
@@ -148,6 +159,7 @@ export function useSeasonalityCoefficients(year: number, mode: "budget" | "reel"
         .from("seasonality_coefficients")
         .upsert(
           {
+            user_id: user.id,
             project_id: currentProject.id,
             year,
             mode,
@@ -199,6 +211,9 @@ export function useSeasonalityCoefficients(year: number, mode: "budget" | "reel"
   };
 }
 
+// --------------------------
+// Hook: Annual Sales Entry
+// --------------------------
 export function useAnnualSalesEntry(year: number, mode: "budget" | "reel") {
   const { currentProject } = useProject();
   const queryClient = useQueryClient();
@@ -207,6 +222,11 @@ export function useAnnualSalesEntry(year: number, mode: "budget" | "reel") {
     queryKey: ["annual-sales-entry", currentProject?.id, year, mode],
     queryFn: async () => {
       if (!currentProject?.id) return { entries: [], products: [] };
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Utilisateur non connecté");
 
       // Fetch products - products use 'simulation' for budget mode, 'reel' for actual
       // Products are shared between budget and actual - we fetch simulation mode products
@@ -236,6 +256,7 @@ export function useAnnualSalesEntry(year: number, mode: "budget" | "reel") {
         .from("annual_sales")
         .select("*")
         .eq("project_id", currentProject.id)
+        .eq("user_id", user.id)
         .eq("year", year)
         .eq("mode", mode);
 
@@ -290,6 +311,9 @@ export function useAnnualSalesEntry(year: number, mode: "budget" | "reel") {
     enabled: !!currentProject?.id,
   });
 
+  // --------------------------
+  // Mutation pour updater les ventes annuelles
+  // --------------------------
   const setAnnualSales = useMutation({
     mutationFn: async ({
       product_id,
@@ -303,6 +327,11 @@ export function useAnnualSalesEntry(year: number, mode: "budget" | "reel") {
       prix_ht_override?: number | null;
     }) => {
       if (!currentProject?.id) throw new Error("Aucun projet sélectionné");
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Utilisateur non connecté");
 
       const {
         data: { user },
@@ -323,7 +352,7 @@ export function useAnnualSalesEntry(year: number, mode: "budget" | "reel") {
             prix_ht_override,
           },
           {
-            onConflict: "project_id,product_id,mode,year,categorie_prix",
+            onConflict: "user_id,project_id,product_id,mode,year,categorie_prix",
           },
         )
         .select()
@@ -370,6 +399,9 @@ export function useAnnualSalesEntry(year: number, mode: "budget" | "reel") {
   };
 }
 
+// --------------------------
+// Hook: Monthly Distribution
+// --------------------------
 export function useMonthlyDistribution(year: number) {
   const { currentProject } = useProject();
   const { coefficientsArray: budgetCoefficients } = useSeasonalityCoefficients(year, "budget");
@@ -380,10 +412,16 @@ export function useMonthlyDistribution(year: number) {
     queryFn: async () => {
       if (!currentProject?.id) return { monthly: [], byChannel: [] };
 
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Utilisateur non connecté");
+
       // Fetch budget annual sales
       const { data: budgetSales } = await supabase
         .from("annual_sales")
         .select("*, products(nom_produit, prix_btc)")
+        .eq("user_id", user.id)
         .eq("project_id", currentProject.id)
         .eq("year", year)
         .eq("mode", "budget");
@@ -392,6 +430,7 @@ export function useMonthlyDistribution(year: number) {
       const { data: reelSales } = await supabase
         .from("annual_sales")
         .select("*, products(nom_produit, prix_btc)")
+        .eq("user_id", user.id)
         .eq("project_id", currentProject.id)
         .eq("year", year)
         .eq("mode", "reel");

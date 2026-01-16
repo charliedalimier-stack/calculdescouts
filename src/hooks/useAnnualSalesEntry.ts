@@ -27,6 +27,7 @@ export interface AnnualSalesEntry {
   id?: string;
   project_id: string;
   product_id: string;
+  user_id: string;
   mode: string;
   year: number;
   categorie_prix: PriceCategory;
@@ -272,11 +273,16 @@ export function useAnnualSalesEntry(year: number, mode: 'budget' | 'reel') {
     }) => {
       if (!currentProject?.id) throw new Error('Aucun projet sélectionné');
 
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Utilisateur non connecté');
+
       const { data, error } = await supabase
         .from('annual_sales')
         .upsert({
           project_id: currentProject.id,
           product_id,
+          user_id: user.id,
           mode,
           year,
           categorie_prix,

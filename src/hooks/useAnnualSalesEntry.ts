@@ -335,15 +335,44 @@ export function useAnnualSalesEntry(year: number, mode: 'budget' | 'reel') {
   };
 }
 
+// Helper to extract coefficients array from database row
+const getCoefArrayFromData = (data: any): number[] => {
+  if (!data) return Array(12).fill(8.33);
+  return [
+    Number(data.month_01), Number(data.month_02), Number(data.month_03),
+    Number(data.month_04), Number(data.month_05), Number(data.month_06),
+    Number(data.month_07), Number(data.month_08), Number(data.month_09),
+    Number(data.month_10), Number(data.month_11), Number(data.month_12),
+  ];
+};
+
 export function useMonthlyDistribution(year: number) {
   const { currentProject } = useProject();
-  const { coefficientsArray: budgetCoefficients } = useSeasonalityCoefficients(year, 'budget');
-  const { coefficientsArray: reelCoefficients } = useSeasonalityCoefficients(year, 'reel');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['monthly-sales-distribution', currentProject?.id, year, budgetCoefficients, reelCoefficients],
+    queryKey: ['monthly-sales-distribution', currentProject?.id, year],
     queryFn: async () => {
       if (!currentProject?.id) return { monthly: [], byChannel: [] };
+
+      // Load coefficients directly in the query function for stable execution
+      const { data: budgetCoefData } = await supabase
+        .from('seasonality_coefficients')
+        .select('*')
+        .eq('project_id', currentProject.id)
+        .eq('year', year)
+        .eq('mode', 'budget')
+        .maybeSingle();
+
+      const { data: reelCoefData } = await supabase
+        .from('seasonality_coefficients')
+        .select('*')
+        .eq('project_id', currentProject.id)
+        .eq('year', year)
+        .eq('mode', 'reel')
+        .maybeSingle();
+
+      const budgetCoefficients = getCoefArrayFromData(budgetCoefData);
+      const reelCoefficients = getCoefArrayFromData(reelCoefData);
 
       // Fetch budget annual sales
       const { data: budgetSales } = await supabase

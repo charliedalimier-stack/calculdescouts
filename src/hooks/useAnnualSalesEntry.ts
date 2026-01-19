@@ -354,8 +354,8 @@ export function useMonthlyDistribution(year: number) {
     queryFn: async () => {
       if (!currentProject?.id) return { monthly: [], byChannel: [] };
 
-      // Load coefficients directly in the query function for stable execution
-      const { data: budgetCoefData } = await supabase
+      // 1. Load coefficients BUDGET directly
+      const { data: budgetCoefData, error: budgetCoefError } = await supabase
         .from('seasonality_coefficients')
         .select('*')
         .eq('project_id', currentProject.id)
@@ -363,7 +363,10 @@ export function useMonthlyDistribution(year: number) {
         .eq('mode', 'budget')
         .maybeSingle();
 
-      const { data: reelCoefData } = await supabase
+      if (budgetCoefError) console.error('Error loading budget coefficients:', budgetCoefError);
+
+      // 2. Load coefficients REEL directly
+      const { data: reelCoefData, error: reelCoefError } = await supabase
         .from('seasonality_coefficients')
         .select('*')
         .eq('project_id', currentProject.id)
@@ -371,53 +374,66 @@ export function useMonthlyDistribution(year: number) {
         .eq('mode', 'reel')
         .maybeSingle();
 
+      if (reelCoefError) console.error('Error loading reel coefficients:', reelCoefError);
+
       const budgetCoefficients = getCoefArrayFromData(budgetCoefData);
       const reelCoefficients = getCoefArrayFromData(reelCoefData);
 
-      // Fetch budget annual sales
-      const { data: budgetSales } = await supabase
+      // 3. Fetch BUDGET annual sales (without join, then get products separately)
+      const { data: budgetSales, error: budgetSalesError } = await supabase
         .from('annual_sales')
-        .select('*, products(nom_produit, prix_btc)')
+        .select('*')
         .eq('project_id', currentProject.id)
         .eq('year', year)
         .eq('mode', 'budget');
 
-      // Fetch reel annual sales
-      const { data: reelSales } = await supabase
+      if (budgetSalesError) console.error('Error loading budget sales:', budgetSalesError);
+
+      // 4. Fetch REEL annual sales
+      const { data: reelSales, error: reelSalesError } = await supabase
         .from('annual_sales')
-        .select('*, products(nom_produit, prix_btc)')
+        .select('*')
         .eq('project_id', currentProject.id)
         .eq('year', year)
         .eq('mode', 'reel');
 
-      // Fetch product prices
+      if (reelSalesError) console.error('Error loading reel sales:', reelSalesError);
+
+      // 5. Collect unique product IDs and fetch products + prices
       const productIds = [...new Set([
         ...(budgetSales || []).map(s => s.product_id),
         ...(reelSales || []).map(s => s.product_id),
       ])];
 
+      // Fetch products (mode = simulation as they are the canonical list)
+      const { data: products } = await supabase
+        .from('products')
+        .select('id, nom_produit, prix_btc')
+        .in('id', productIds.length > 0 ? productIds : ['00000000-0000-0000-0000-000000000000']);
+
+      // Fetch product prices
       const { data: prices } = await supabase
         .from('product_prices')
         .select('*')
-        .in('product_id', productIds)
-        .eq('mode', 'simulation'); // Use simulation mode for base prices
+        .in('product_id', productIds.length > 0 ? productIds : ['00000000-0000-0000-0000-000000000000'])
+        .eq('mode', 'simulation');
 
+      // Helper to get price for a product/category
       const getPrice = (productId: string, category: string): number => {
         const price = (prices || []).find(
           p => p.product_id === productId && p.categorie_prix === category
         );
         if (price) return Number(price.prix_ht);
         
-        const budgetEntry = (budgetSales || []).find(s => s.product_id === productId);
-        const reelEntry = (reelSales || []).find(s => s.product_id === productId);
-        const prixBtc = Number((budgetEntry?.products as any)?.prix_btc || (reelEntry?.products as any)?.prix_btc || 0);
+        const product = (products || []).find(p => p.id === productId);
+        const prixBtc = Number(product?.prix_btc || 0);
         
         if (category === 'BTC') return prixBtc;
         if (category === 'BTB') return prixBtc * 0.7;
-        return prixBtc * 0.7 * 0.85;
+        return prixBtc * 0.7 * 0.85; // Distributeur
       };
 
-      // Calculate monthly distribution
+      // 6. Calculate monthly distribution
       const monthly: MonthlyDistribution[] = [];
       
       for (let i = 0; i < 12; i++) {
@@ -430,16 +446,22 @@ export function useMonthlyDistribution(year: number) {
         let budgetCa = 0;
         let reelCa = 0;
 
+        // Process BUDGET sales for this month
         (budgetSales || []).forEach(sale => {
-          const qty = Math.round(sale.quantite_annuelle * budgetCoef);
-          const prix = sale.prix_ht_override ? Number(sale.prix_ht_override) : getPrice(sale.product_id, sale.categorie_prix);
+          const qty = Math.round(Number(sale.quantite_annuelle) * budgetCoef);
+          const prix = sale.prix_ht_override 
+            ? Number(sale.prix_ht_override) 
+            : getPrice(sale.product_id, sale.categorie_prix);
           budgetQty += qty;
           budgetCa += qty * prix;
         });
 
+        // Process REEL sales for this month
         (reelSales || []).forEach(sale => {
-          const qty = Math.round(sale.quantite_annuelle * reelCoef);
-          const prix = sale.prix_ht_override ? Number(sale.prix_ht_override) : getPrice(sale.product_id, sale.categorie_prix);
+          const qty = Math.round(Number(sale.quantite_annuelle) * reelCoef);
+          const prix = sale.prix_ht_override 
+            ? Number(sale.prix_ht_override) 
+            : getPrice(sale.product_id, sale.categorie_prix);
           reelQty += qty;
           reelCa += qty * prix;
         });
@@ -461,23 +483,27 @@ export function useMonthlyDistribution(year: number) {
         });
       }
 
-      // Calculate by channel distribution
+      // 7. Calculate by channel distribution (annual totals per channel)
       const categories: PriceCategory[] = ['BTC', 'BTB', 'Distributeur'];
       const byChannel: ChannelDistribution[] = categories.map(cat => {
         const budgetEntries = (budgetSales || []).filter(s => s.categorie_prix === cat);
         const reelEntries = (reelSales || []).filter(s => s.categorie_prix === cat);
 
-        const budgetQty = budgetEntries.reduce((sum, s) => sum + s.quantite_annuelle, 0);
-        const reelQty = reelEntries.reduce((sum, s) => sum + s.quantite_annuelle, 0);
+        const budgetQty = budgetEntries.reduce((sum, s) => sum + Number(s.quantite_annuelle), 0);
+        const reelQty = reelEntries.reduce((sum, s) => sum + Number(s.quantite_annuelle), 0);
         
         const budgetCa = budgetEntries.reduce((sum, s) => {
-          const prix = s.prix_ht_override ? Number(s.prix_ht_override) : getPrice(s.product_id, cat);
-          return sum + s.quantite_annuelle * prix;
+          const prix = s.prix_ht_override 
+            ? Number(s.prix_ht_override) 
+            : getPrice(s.product_id, cat);
+          return sum + Number(s.quantite_annuelle) * prix;
         }, 0);
         
         const reelCa = reelEntries.reduce((sum, s) => {
-          const prix = s.prix_ht_override ? Number(s.prix_ht_override) : getPrice(s.product_id, cat);
-          return sum + s.quantite_annuelle * prix;
+          const prix = s.prix_ht_override 
+            ? Number(s.prix_ht_override) 
+            : getPrice(s.product_id, cat);
+          return sum + Number(s.quantite_annuelle) * prix;
         }, 0);
 
         const ecartPercent = budgetCa > 0 ? ((reelCa - budgetCa) / budgetCa) * 100 : 0;

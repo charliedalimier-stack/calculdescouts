@@ -354,8 +354,8 @@ export function useMonthlyDistribution(year: number) {
     queryFn: async () => {
       if (!currentProject?.id) return { monthly: [], byChannel: [] };
 
-      // 1. Load coefficients BUDGET directly
-      const { data: budgetCoefData, error: budgetCoefError } = await supabase
+      // 1. Load BUDGET coefficients
+      const { data: budgetCoefData } = await supabase
         .from('seasonality_coefficients')
         .select('*')
         .eq('project_id', currentProject.id)
@@ -363,10 +363,8 @@ export function useMonthlyDistribution(year: number) {
         .eq('mode', 'budget')
         .maybeSingle();
 
-      if (budgetCoefError) console.error('Error loading budget coefficients:', budgetCoefError);
-
-      // 2. Load coefficients REEL directly
-      const { data: reelCoefData, error: reelCoefError } = await supabase
+      // 2. Load REEL coefficients
+      const { data: reelCoefData } = await supabase
         .from('seasonality_coefficients')
         .select('*')
         .eq('project_id', currentProject.id)
@@ -374,51 +372,61 @@ export function useMonthlyDistribution(year: number) {
         .eq('mode', 'reel')
         .maybeSingle();
 
-      if (reelCoefError) console.error('Error loading reel coefficients:', reelCoefError);
-
+      // Convert to arrays with defaults
       const budgetCoefficients = getCoefArrayFromData(budgetCoefData);
       const reelCoefficients = getCoefArrayFromData(reelCoefData);
 
-      // 3. Fetch BUDGET annual sales (without join, then get products separately)
-      const { data: budgetSales, error: budgetSalesError } = await supabase
+      // 3. Fetch BUDGET annual sales
+      const { data: budgetSales } = await supabase
         .from('annual_sales')
         .select('*')
         .eq('project_id', currentProject.id)
         .eq('year', year)
         .eq('mode', 'budget');
 
-      if (budgetSalesError) console.error('Error loading budget sales:', budgetSalesError);
-
       // 4. Fetch REEL annual sales
-      const { data: reelSales, error: reelSalesError } = await supabase
+      const { data: reelSales } = await supabase
         .from('annual_sales')
         .select('*')
         .eq('project_id', currentProject.id)
         .eq('year', year)
         .eq('mode', 'reel');
 
-      if (reelSalesError) console.error('Error loading reel sales:', reelSalesError);
-
-      // 5. Collect unique product IDs and fetch products + prices
-      const productIds = [...new Set([
+      // 5. Collect unique product IDs
+      const allProductIds = [...new Set([
         ...(budgetSales || []).map(s => s.product_id),
         ...(reelSales || []).map(s => s.product_id),
       ])];
 
-      // Fetch products (mode = simulation as they are the canonical list)
+      // Guard: if no products, return empty
+      if (allProductIds.length === 0) {
+        return { monthly: MONTH_LABELS.map((label, i) => ({
+          month: `${year}-${(i + 1).toString().padStart(2, '0')}-01`,
+          month_label: label,
+          budget_qty: 0,
+          reel_qty: 0,
+          budget_ca: 0,
+          reel_ca: 0,
+          ecart_qty: 0,
+          ecart_ca: 0,
+          ecart_percent: 0,
+        })), byChannel: [] };
+      }
+
+      // Fetch products (simulation mode = canonical)
       const { data: products } = await supabase
         .from('products')
         .select('id, nom_produit, prix_btc')
-        .in('id', productIds.length > 0 ? productIds : ['00000000-0000-0000-0000-000000000000']);
+        .in('id', allProductIds);
 
       // Fetch product prices
       const { data: prices } = await supabase
         .from('product_prices')
         .select('*')
-        .in('product_id', productIds.length > 0 ? productIds : ['00000000-0000-0000-0000-000000000000'])
+        .in('product_id', allProductIds)
         .eq('mode', 'simulation');
 
-      // Helper to get price for a product/category
+      // Helper: get price for a product/category
       const getPrice = (productId: string, category: string): number => {
         const price = (prices || []).find(
           p => p.product_id === productId && p.categorie_prix === category
@@ -433,37 +441,41 @@ export function useMonthlyDistribution(year: number) {
         return prixBtc * 0.7 * 0.85; // Distributeur
       };
 
-      // 6. Calculate monthly distribution
+      // 6. Calculate monthly distribution (totals per month)
       const monthly: MonthlyDistribution[] = [];
       
       for (let i = 0; i < 12; i++) {
         const monthStr = `${year}-${(i + 1).toString().padStart(2, '0')}-01`;
-        const budgetCoef = budgetCoefficients[i] / 100;
-        const reelCoef = reelCoefficients[i] / 100;
+        
+        // ⚠️ CRITICAL: Convert percentage to decimal (÷100)
+        const budgetCoef = Number(budgetCoefficients[i]) / 100;
+        const reelCoef = Number(reelCoefficients[i]) / 100;
 
         let budgetQty = 0;
         let reelQty = 0;
         let budgetCa = 0;
         let reelCa = 0;
 
-        // Process BUDGET sales for this month
+        // Process BUDGET sales
         (budgetSales || []).forEach(sale => {
-          const qty = Math.round(Number(sale.quantite_annuelle) * budgetCoef);
+          const annualQty = Number(sale.quantite_annuelle) || 0;
+          const monthQty = Math.round(annualQty * budgetCoef);
           const prix = sale.prix_ht_override 
             ? Number(sale.prix_ht_override) 
             : getPrice(sale.product_id, sale.categorie_prix);
-          budgetQty += qty;
-          budgetCa += qty * prix;
+          budgetQty += monthQty;
+          budgetCa += monthQty * prix;
         });
 
-        // Process REEL sales for this month
+        // Process REEL sales
         (reelSales || []).forEach(sale => {
-          const qty = Math.round(Number(sale.quantite_annuelle) * reelCoef);
+          const annualQty = Number(sale.quantite_annuelle) || 0;
+          const monthQty = Math.round(annualQty * reelCoef);
           const prix = sale.prix_ht_override 
             ? Number(sale.prix_ht_override) 
             : getPrice(sale.product_id, sale.categorie_prix);
-          reelQty += qty;
-          reelCa += qty * prix;
+          reelQty += monthQty;
+          reelCa += monthQty * prix;
         });
 
         const ecartQty = reelQty - budgetQty;
@@ -483,7 +495,7 @@ export function useMonthlyDistribution(year: number) {
         });
       }
 
-      // 7. Calculate by channel distribution (annual totals per channel)
+      // 7. Calculate by channel distribution (annual totals)
       const categories: PriceCategory[] = ['BTC', 'BTB', 'Distributeur'];
       const byChannel: ChannelDistribution[] = categories.map(cat => {
         const budgetEntries = (budgetSales || []).filter(s => s.categorie_prix === cat);

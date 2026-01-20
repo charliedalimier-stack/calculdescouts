@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useState, useMemo } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { BCGMatrix } from "@/components/dashboard/BCGMatrix";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { PeriodSelector, DataMode } from "@/components/layout/PeriodSelector";
+import { getCurrentYear } from "@/lib/dateOptions";
 
 const getQuadrant = (margin: number, volume: number, avgMargin: number, avgVolume: number) => {
   if (margin >= avgMargin && volume >= avgVolume) return "star";
@@ -22,6 +24,15 @@ const getQuadrant = (margin: number, volume: number, avgMargin: number, avgVolum
 };
 
 const Matrix = () => {
+  const [selectedYear, setSelectedYear] = useState(getCurrentYear());
+  const [dataMode, setDataMode] = useState<DataMode>('budget');
+
+  const handlePeriodChange = ({ year, mode }: { month?: number; year: number; mode: DataMode }) => {
+    console.log('[Matrix] Period changed:', { year, mode });
+    setSelectedYear(year);
+    setDataMode(mode);
+  };
+
   const { productsWithCosts, isLoadingWithCosts } = useProducts();
   const { salesData, isLoading: isLoadingSales } = useSales();
 
@@ -110,6 +121,16 @@ const Matrix = () => {
       title="Matrice BCG"
       subtitle="Analysez le positionnement stratégique de vos produits"
     >
+      {/* Period Selector */}
+      <div className="mb-6">
+        <PeriodSelector
+          year={selectedYear}
+          mode={dataMode}
+          showMonth={false}
+          onChange={handlePeriodChange}
+        />
+      </div>
+
       <div className="mb-6">
         <Card className="bg-accent/30">
           <CardContent className="flex items-start gap-4 p-6">

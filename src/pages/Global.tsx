@@ -4,13 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -47,10 +40,10 @@ import {
   Receipt,
 } from "lucide-react";
 import { useGlobalSynthesis } from "@/hooks/useGlobalSynthesis";
-import { useMode } from "@/contexts/ModeContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { getYearOptions, getCurrentYear, MONTH_LABELS_FULL } from "@/lib/dateOptions";
+import { getCurrentYear, MONTH_LABELS_FULL } from "@/lib/dateOptions";
+import { PeriodSelector, DataMode } from "@/components/layout/PeriodSelector";
 
 type PeriodType = 'month' | 'year';
 
@@ -109,10 +102,10 @@ const getVariationBadge = (current: number, previous: number) => {
 };
 
 const Global = () => {
-  const { mode } = useMode();
   const [periodType, setPeriodType] = useState<PeriodType>('month');
   const [selectedYear, setSelectedYear] = useState(getCurrentYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [dataMode, setDataMode] = useState<DataMode>('budget');
 
   const { data: synthesis, isLoading } = useGlobalSynthesis({
     periodType,
@@ -120,11 +113,17 @@ const Global = () => {
     month: periodType === 'month' ? selectedMonth : undefined,
   });
 
-  const yearOptions = getYearOptions();
-
   const periodLabel = periodType === 'month' 
     ? `${MONTHS.find(m => m.value === selectedMonth)?.label} ${selectedYear}`
     : `Année ${selectedYear}`;
+
+  // Period change handler
+  const handlePeriodChange = ({ month, year, mode }: { month?: number; year: number; mode: DataMode }) => {
+    console.log('[Global] Period changed:', { month, year, mode });
+    if (month !== undefined) setSelectedMonth(month);
+    setSelectedYear(year);
+    setDataMode(mode);
+  };
 
   // Prepare chart data
   const barChartData = [
@@ -163,12 +162,12 @@ const Global = () => {
   return (
     <AppLayout
       title="Synthèse Globale"
-      subtitle={`Vue consolidée - Mode ${mode === 'simulation' ? 'Budget' : 'Réel'}`}
+      subtitle={`Vue consolidée - Mode ${dataMode === 'budget' ? 'Budget' : 'Réel'}`}
     >
       {/* Period Selectors */}
       <div className="mb-6 flex flex-wrap items-center gap-4">
         <Badge variant="outline" className="text-sm px-3 py-1">
-          {mode === 'simulation' ? '📊 Budget' : '✅ Réel'}
+          {dataMode === 'budget' ? '📊 Budget' : '✅ Réel'}
         </Badge>
 
         <Tabs value={periodType} onValueChange={(v) => setPeriodType(v as PeriodType)}>
@@ -184,29 +183,13 @@ const Global = () => {
           </TabsList>
         </Tabs>
 
-        <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
-          <SelectTrigger className="w-32">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {yearOptions.map(opt => (
-              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {periodType === 'month' && (
-          <Select value={selectedMonth.toString()} onValueChange={(v) => setSelectedMonth(parseInt(v))}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {MONTHS.map(m => (
-                <SelectItem key={m.value} value={m.value.toString()}>{m.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+        <PeriodSelector
+          month={periodType === 'month' ? selectedMonth : undefined}
+          year={selectedYear}
+          mode={dataMode}
+          showMonth={periodType === 'month'}
+          onChange={handlePeriodChange}
+        />
       </div>
 
       {/* Alert Banner */}

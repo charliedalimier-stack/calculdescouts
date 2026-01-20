@@ -7,6 +7,7 @@ import {
   Receipt,
   AlertTriangle,
   Calendar,
+  CalendarRange,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { KPICard } from "@/components/dashboard/KPICard";
@@ -19,17 +20,12 @@ import { useProducts } from "@/hooks/useProducts";
 import { useGlobalSynthesis } from "@/hooks/useGlobalSynthesis";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
-import { useState, useMemo } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { getYearOptions, getCurrentYear, MONTH_LABELS_FULL } from "@/lib/dateOptions";
+import { Badge } from "@/components/ui/badge";
+import { useState, useMemo } from "react";
+import { getCurrentYear, MONTH_LABELS_FULL } from "@/lib/dateOptions";
 import { DEFINITIONS } from "@/lib/pedagogicDefinitions";
+import { PeriodSelector, DataMode } from "@/components/layout/PeriodSelector";
 
 const MONTHS = MONTH_LABELS_FULL.map((label, index) => ({
   value: index + 1,
@@ -40,6 +36,7 @@ const Index = () => {
   const [periodType, setPeriodType] = useState<'month' | 'year'>('month');
   const [selectedYear, setSelectedYear] = useState(getCurrentYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [dataMode, setDataMode] = useState<DataMode>('budget');
 
   const { products, isLoadingWithCosts } = useProducts();
   const { data: synthesisData, isLoading: isLoadingSynthesis } = useGlobalSynthesis({
@@ -64,9 +61,6 @@ const Index = () => {
     previous: null,
     alerts: { resultat_negatif: false, cash_flow_negatif: false, frais_vs_ca: 0 },
   }, [synthesisData]);
-
-  // Generate years list (2025-2030)
-  const years = getYearOptions().map(y => parseInt(y.value));
 
   const topCategories = useMemo(() => {
     if (!synthesis.par_categorie) return [];
@@ -93,6 +87,14 @@ const Index = () => {
     ? ((synthesis.ca_ht - synthesis.previous.ca_ht) / synthesis.previous.ca_ht) * 100 
     : 0;
 
+  // Period change handler
+  const handlePeriodChange = ({ month, year, mode }: { month?: number; year: number; mode: DataMode }) => {
+    console.log('[Index] Period changed:', { month, year, mode });
+    if (month !== undefined) setSelectedMonth(month);
+    setSelectedYear(year);
+    setDataMode(mode);
+  };
+
   return (
     <AppLayout
       title="Tableau de bord"
@@ -101,42 +103,31 @@ const Index = () => {
       {/* Period Selector */}
       <Card className="mb-6">
         <CardContent className="flex flex-wrap items-center gap-4 p-4">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-muted-foreground" />
-            <span className="text-sm font-medium">Période :</span>
-          </div>
+          <Badge variant="outline" className="text-sm px-3 py-1">
+            {dataMode === 'budget' ? '📊 Budget' : '✅ Réel'}
+          </Badge>
+
           <Tabs value={periodType} onValueChange={(v) => setPeriodType(v as 'month' | 'year')}>
             <TabsList>
-              <TabsTrigger value="month">Mois</TabsTrigger>
-              <TabsTrigger value="year">Année</TabsTrigger>
+              <TabsTrigger value="month" className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Mois
+              </TabsTrigger>
+              <TabsTrigger value="year" className="flex items-center gap-2">
+                <CalendarRange className="h-4 w-4" />
+                Année
+              </TabsTrigger>
             </TabsList>
           </Tabs>
-          {periodType === 'month' && (
-            <Select value={selectedMonth.toString()} onValueChange={(v) => setSelectedMonth(parseInt(v))}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {MONTHS.map((month) => (
-                  <SelectItem key={month.value} value={month.value.toString()}>
-                    {month.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
-            <SelectTrigger className="w-[100px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {years.map((year) => (
-                <SelectItem key={year} value={year.toString()}>
-                  {year}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+
+          <PeriodSelector
+            month={periodType === 'month' ? selectedMonth : undefined}
+            year={selectedYear}
+            mode={dataMode}
+            showMonth={periodType === 'month'}
+            onChange={handlePeriodChange}
+          />
+
           <span className="ml-auto text-sm text-muted-foreground">{periodLabel}</span>
         </CardContent>
       </Card>

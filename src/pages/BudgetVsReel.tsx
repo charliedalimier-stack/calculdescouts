@@ -4,13 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -43,7 +36,8 @@ import {
 import { useBudgetVsReel } from "@/hooks/useBudgetVsReel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { getYearOptions, getCurrentYear, MONTH_LABELS_FULL } from "@/lib/dateOptions";
+import { getCurrentYear, MONTH_LABELS_FULL } from "@/lib/dateOptions";
+import { PeriodSelector, DataMode } from "@/components/layout/PeriodSelector";
 
 type PeriodType = 'month' | 'year';
 
@@ -89,9 +83,10 @@ const getEcartIcon = (ecart: number, isExpense: boolean = false) => {
 const BudgetVsReel = () => {
   const currentDate = new Date();
   const [periodType, setPeriodType] = useState<PeriodType>('year');
-  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
+  const [selectedYear, setSelectedYear] = useState(getCurrentYear());
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
   const [activeTab, setActiveTab] = useState('summary');
+  const [dataMode, setDataMode] = useState<DataMode>('budget');
 
   const { data, isLoading } = useBudgetVsReel({
     periodType,
@@ -99,11 +94,17 @@ const BudgetVsReel = () => {
     month: periodType === 'month' ? selectedMonth : undefined,
   });
 
-  const yearOptions = getYearOptions();
-
   const periodLabel = periodType === 'month' 
     ? `${MONTHS.find(m => m.value === selectedMonth)?.label} ${selectedYear}`
     : `Année ${selectedYear}`;
+
+  // Period change handler
+  const handlePeriodChange = ({ month, year, mode }: { month?: number; year: number; mode: DataMode }) => {
+    console.log('[BudgetVsReel] Period changed:', { month, year, mode });
+    if (month !== undefined) setSelectedMonth(month);
+    setSelectedYear(year);
+    setDataMode(mode);
+  };
 
   // Chart data for monthly comparison
   const monthlyChartData = useMemo(() => {
@@ -174,29 +175,14 @@ const BudgetVsReel = () => {
           </TabsList>
         </Tabs>
 
-        <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
-          <SelectTrigger className="w-32">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {yearOptions.map(opt => (
-              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {periodType === 'month' && (
-          <Select value={selectedMonth.toString()} onValueChange={(v) => setSelectedMonth(parseInt(v))}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {MONTHS.map(m => (
-                <SelectItem key={m.value} value={m.value.toString()}>{m.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+        <PeriodSelector
+          month={periodType === 'month' ? selectedMonth : undefined}
+          year={selectedYear}
+          mode={dataMode}
+          showMonth={periodType === 'month'}
+          showMode={false}
+          onChange={handlePeriodChange}
+        />
       </div>
 
       {/* Tabs Navigation */}

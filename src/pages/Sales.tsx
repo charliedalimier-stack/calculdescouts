@@ -2,16 +2,9 @@ import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { TrendingUp, TrendingDown, Target, BarChart3, Calendar, Edit3, Eye } from "lucide-react";
+import { TrendingUp, TrendingDown, Target, BarChart3, Edit3, Eye } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getYearOptions, getCurrentYear } from "@/lib/dateOptions";
+import { getCurrentYear } from "@/lib/dateOptions";
 import { 
   useSeasonalityCoefficients, 
   useAnnualSalesEntry, 
@@ -22,18 +15,16 @@ import { SeasonalityEditor } from "@/components/sales/SeasonalityEditor";
 import { MonthlyViewTable } from "@/components/sales/MonthlyViewTable";
 import { ObjectivesComparisonTable } from "@/components/sales/ObjectivesComparisonTable";
 import { SalesCharts } from "@/components/sales/SalesCharts";
+import { PeriodSelector, DataMode } from "@/components/layout/PeriodSelector";
 
 type ViewMode = 'entry' | 'monthly' | 'comparison';
-type DataMode = 'budget' | 'reel';
 
 const Sales = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('entry');
   const [dataMode, setDataMode] = useState<DataMode>('budget');
   const [selectedYear, setSelectedYear] = useState(getCurrentYear());
 
-  const yearOptions = getYearOptions();
-
-  // Hooks
+  // Hooks with dynamic year and mode
   const { coefficients, isLoading: loadingCoefs, updateCoefficients } = useSeasonalityCoefficients(selectedYear, dataMode);
   const { entries, totals: entryTotals, isLoading: loadingEntries, setAnnualSales } = useAnnualSalesEntry(selectedYear, dataMode);
   const { monthly, byChannel, totals: monthlyTotals, isLoading: loadingMonthly } = useMonthlyDistribution(selectedYear);
@@ -45,6 +36,13 @@ const Sales = () => {
   const reelCa = monthlyTotals.reel_ca;
   const ecartCa = monthlyTotals.ecart_ca;
   const ecartPercent = monthlyTotals.ecart_percent;
+
+  // Period change handler
+  const handlePeriodChange = ({ year, mode }: { month?: number; year: number; mode: DataMode }) => {
+    console.log('[Sales] Period changed:', { year, mode });
+    setSelectedYear(year);
+    setDataMode(mode);
+  };
 
   if (isLoading && entries.length === 0) {
     return (
@@ -68,36 +66,14 @@ const Sales = () => {
       title="Ventes"
       subtitle="Saisie annuelle → Lecture mensuelle"
     >
-      {/* Selectors Row */}
+      {/* Period Selector */}
       <div className="mb-6 flex flex-wrap items-center gap-4">
-        {/* Year Selector */}
-        <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
-          <SelectTrigger className="w-32">
-            <Calendar className="h-4 w-4 mr-2" />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {yearOptions.map(option => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {/* Mode Selector */}
-        <Tabs value={dataMode} onValueChange={(v) => setDataMode(v as DataMode)}>
-          <TabsList>
-            <TabsTrigger value="budget" className="flex items-center gap-2">
-              <Target className="h-4 w-4" />
-              Budget
-            </TabsTrigger>
-            <TabsTrigger value="reel" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Réel
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <PeriodSelector
+          year={selectedYear}
+          mode={dataMode}
+          showMonth={false}
+          onChange={handlePeriodChange}
+        />
 
         <div className="flex-1" />
 

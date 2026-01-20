@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { MarginChart } from "@/components/dashboard/MarginChart";
 import { CategoryPieChart } from "@/components/dashboard/CategoryPieChart";
@@ -24,8 +25,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useMemo } from "react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { DEFINITIONS } from "@/lib/pedagogicDefinitions";
+import { PeriodSelector, DataMode } from "@/components/layout/PeriodSelector";
+import { getCurrentYear } from "@/lib/dateOptions";
 
 const Analysis = () => {
+  const [selectedYear, setSelectedYear] = useState(getCurrentYear());
+  const [dataMode, setDataMode] = useState<DataMode>('budget');
+
+  const handlePeriodChange = ({ year, mode }: { month?: number; year: number; mode: DataMode }) => {
+    console.log('[Analysis] Period changed:', { year, mode });
+    setSelectedYear(year);
+    setDataMode(mode);
+  };
+
   const { productsWithCosts, isLoadingWithCosts } = useProducts();
   const { salesData, isLoading: isLoadingSales } = useSales();
   const { settings, isLoading: isLoadingSettings } = useProjectSettings();
@@ -146,6 +158,16 @@ const Analysis = () => {
       title="Analyses"
       subtitle="Visualisations avancées pour la prise de décision"
     >
+      {/* Period Selector */}
+      <div className="mb-6">
+        <PeriodSelector
+          year={selectedYear}
+          mode={dataMode}
+          showMonth={false}
+          onChange={handlePeriodChange}
+        />
+      </div>
+
       {/* Pareto Analysis */}
       <Card className="mb-8">
         <CardHeader>

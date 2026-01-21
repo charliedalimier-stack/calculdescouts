@@ -23,9 +23,20 @@ const getQuadrant = (margin: number, volume: number, avgMargin: number, avgVolum
   return "dog";
 };
 
+// Convert DataMode to product/sales mode
+const mapDataModeToProductMode = (mode: DataMode): 'simulation' | 'reel' => {
+  return mode === 'budget' ? 'simulation' : 'reel';
+};
+
 const Matrix = () => {
   const [selectedYear, setSelectedYear] = useState(getCurrentYear());
   const [dataMode, setDataMode] = useState<DataMode>('budget');
+
+  // Convert DataMode to the mode expected by hooks
+  const productMode = mapDataModeToProductMode(dataMode);
+
+  // Log current mode for debugging
+  console.log('[Matrix] Current dataMode:', dataMode, '-> productMode:', productMode);
 
   const handlePeriodChange = ({ year, mode }: { month?: number; year: number; mode: DataMode }) => {
     console.log('[Matrix] Period changed:', { year, mode });
@@ -33,8 +44,8 @@ const Matrix = () => {
     setDataMode(mode);
   };
 
-  const { productsWithCosts, isLoadingWithCosts } = useProducts();
-  const { salesData, isLoading: isLoadingSales } = useSales();
+  const { productsWithCosts, isLoadingWithCosts } = useProducts(productMode);
+  const { salesData, isLoading: isLoadingSales } = useSales(undefined, productMode);
 
   // Group real products by BCG quadrant
   const productsByQuadrant = useMemo(() => {

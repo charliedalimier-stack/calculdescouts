@@ -101,16 +101,28 @@ const getVariationBadge = (current: number, previous: number) => {
   return null;
 };
 
+// Convert DataMode to product/sales mode
+const mapDataModeToProductMode = (mode: DataMode): 'simulation' | 'reel' => {
+  return mode === 'budget' ? 'simulation' : 'reel';
+};
+
 const Global = () => {
   const [periodType, setPeriodType] = useState<PeriodType>('month');
   const [selectedYear, setSelectedYear] = useState(getCurrentYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [dataMode, setDataMode] = useState<DataMode>('budget');
 
+  // Convert DataMode to the mode expected by hooks
+  const productMode = mapDataModeToProductMode(dataMode);
+
+  // Log current mode for debugging
+  console.log('[Global] Current dataMode:', dataMode, '-> productMode:', productMode);
+
   const { data: synthesis, isLoading } = useGlobalSynthesis({
     periodType,
     year: selectedYear,
     month: periodType === 'month' ? selectedMonth : undefined,
+    mode: productMode,
   });
 
   const periodLabel = periodType === 'month' 

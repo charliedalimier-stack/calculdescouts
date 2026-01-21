@@ -32,17 +32,29 @@ const MONTHS = MONTH_LABELS_FULL.map((label, index) => ({
   label,
 }));
 
+// Convert DataMode to product/sales mode
+const mapDataModeToProductMode = (mode: DataMode): 'simulation' | 'reel' => {
+  return mode === 'budget' ? 'simulation' : 'reel';
+};
+
 const Index = () => {
   const [periodType, setPeriodType] = useState<'month' | 'year'>('month');
   const [selectedYear, setSelectedYear] = useState(getCurrentYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [dataMode, setDataMode] = useState<DataMode>('budget');
 
-  const { products, isLoadingWithCosts } = useProducts();
+  // Convert DataMode to the mode expected by hooks
+  const productMode = mapDataModeToProductMode(dataMode);
+
+  // Log current mode for debugging
+  console.log('[Index] Current dataMode:', dataMode, '-> productMode:', productMode);
+
+  const { products, isLoadingWithCosts } = useProducts(productMode);
   const { data: synthesisData, isLoading: isLoadingSynthesis } = useGlobalSynthesis({
     periodType,
     year: selectedYear,
     month: periodType === 'month' ? selectedMonth : undefined,
+    mode: productMode,
   });
 
   // Default synthesis if no data

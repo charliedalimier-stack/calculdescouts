@@ -1,11 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '@/contexts/ProjectContext';
-import { useMode } from '@/contexts/ModeContext';
 
 // Helper to map display mode to database mode
-// 'simulation' in ModeContext = 'budget' in annual_sales table
-// This ensures consistency between old and new data models
+// 'simulation' = 'budget' in annual_sales table
+// 'reel' = 'reel' in annual_sales table
 const mapModeForSales = (mode: string): 'budget' | 'reel' => {
   return mode === 'simulation' ? 'budget' : 'reel';
 };
@@ -78,11 +77,22 @@ interface UseGlobalSynthesisParams {
   periodType: 'month' | 'year';
   year: number;
   month?: number;
+  mode?: 'simulation' | 'reel';
 }
 
-export function useGlobalSynthesis({ periodType, year, month }: UseGlobalSynthesisParams) {
+/**
+ * Hook to fetch global financial synthesis.
+ * 
+ * @param periodType - 'month' or 'year'
+ * @param year - The year to analyze
+ * @param month - Optional month (1-12) for monthly analysis
+ * @param mode - Optional mode ('simulation' | 'reel'). Defaults to 'simulation'.
+ */
+export function useGlobalSynthesis({ periodType, year, month, mode = 'simulation' }: UseGlobalSynthesisParams) {
   const { currentProject } = useProject();
-  const { mode } = useMode();
+
+  // Log mode usage for debugging
+  console.log('[useGlobalSynthesis] Using mode:', mode, 'year:', year, 'month:', month);
 
   return useQuery({
     queryKey: ['global-synthesis', currentProject?.id, mode, periodType, year, month],
@@ -92,6 +102,7 @@ export function useGlobalSynthesis({ periodType, year, month }: UseGlobalSynthes
       }
 
       const projectId = currentProject.id;
+      console.log('[useGlobalSynthesis] Fetching synthesis with mode:', mode);
       
       // Build date range based on period type
       let startDate: string;
@@ -496,54 +507,62 @@ export function useGlobalSynthesis({ periodType, year, month }: UseGlobalSynthes
         if (!monthlyMap[mois]) {
           monthlyMap[mois] = { ca: 0, marge: 0, frais: 0 };
         }
-        monthlyMap[mois].frais += frais;
+        monthlyMap[mois].frais = frais;
       });
 
+      // Calculate results
+      const margeBrute = totalCaHt - totalCoutProduction;
+      const tauxMarge = totalCaHt > 0 ? (margeBrute / totalCaHt) * 100 : 0;
+      const resultatAvantCharges = margeBrute;
+      const resultatNet = margeBrute - fraisPro;
+      const cashFlow = totalCaHt + totalTvaCollectee - totalCoutProduction - totalTvaDeductible;
+      const cashFlowApresFrais = cashFlow - fraisPro - fraisTva;
+      const caTtc = totalCaHt + totalTvaCollectee;
+
+      // Format monthly data
       const monthlyData = Object.entries(monthlyMap)
+        .sort(([a], [b]) => a.localeCompare(b))
         .map(([mois, data]) => ({
           mois,
           ca_ht: data.ca,
           marge: data.marge,
           frais: data.frais,
           resultat_net: data.marge - data.frais,
+        }));
+
+      // Format canal data
+      const parCanal = Object.entries(canalData)
+        .filter(([_, data]) => data.ca > 0)
+        .map(([canal, data]) => ({
+          canal,
+          ca_ht: data.ca,
+          marge: data.marge,
+          percent_ca: totalCaHt > 0 ? (data.ca / totalCaHt) * 100 : 0,
+        }));
+
+      // Format category data
+      const parCategorie = Object.entries(categoryData)
+        .filter(([_, data]) => data.ca > 0)
+        .map(([category_id, data]) => ({
+          category_id,
+          category_name: data.name,
+          ca: data.ca,
+          marge: data.marge,
+          rentabilite: data.ca > 0 ? (data.marge / data.ca) * 100 : 0,
         }))
-        .sort((a, b) => a.mois.localeCompare(b.mois));
+        .sort((a, b) => b.ca - a.ca);
 
-      // Build result
-      const margeBrute = totalCaHt - totalCoutProduction;
-      const tauxMarge = totalCaHt > 0 ? (margeBrute / totalCaHt) * 100 : 0;
-      const resultatNet = margeBrute - fraisPro;
-      const cashFlow = totalCaHt + totalTvaCollectee - totalCoutProduction - totalTvaDeductible;
-      const cashFlowApresFrais = cashFlow - fraisPro - fraisTva + fraisTva; // fraisTva is deductible
-      const prevCashFlowValue = prevCaHt > 0 ? prevCashFlow : 0;
-
-      const parCategorie = Object.entries(categoryData).map(([id, data]) => ({
-        category_id: id,
-        category_name: data.name,
-        ca: data.ca,
-        marge: data.marge,
-        rentabilite: data.ca > 0 ? (data.marge / data.ca) * 100 : 0,
-      }));
-
-      const parCanal = Object.entries(canalData).map(([canal, data]) => ({
-        canal,
-        ca_ht: data.ca,
-        marge: data.marge,
-        percent_ca: totalCaHt > 0 ? (data.ca / totalCaHt) * 100 : 0,
-      }));
-
-      const coutMoyenUnitaire = totalQuantite > 0 ? totalCoutProduction / totalQuantite : 0;
-      const nbProduitsActifs = new Set((sales || []).map(s => s.product_id)).size;
+      console.log('[useGlobalSynthesis] Computed CA:', totalCaHt, 'Marge:', margeBrute, 'for mode:', mode);
 
       return {
         ca_ht: totalCaHt,
-        ca_ttc: totalCaHt + totalTvaCollectee,
+        ca_ttc: caTtc,
         cout_production: totalCoutProduction,
         marge_brute: margeBrute,
         taux_marge: tauxMarge,
         tva_collectee: totalTvaCollectee,
-        tva_deductible: totalTvaDeductible + fraisTva,
-        resultat_avant_charges: margeBrute,
+        tva_deductible: totalTvaDeductible,
+        resultat_avant_charges: resultatAvantCharges,
         cash_flow: cashFlow,
         frais_professionnels: fraisPro,
         frais_tva_deductible: fraisTva,
@@ -552,12 +571,12 @@ export function useGlobalSynthesis({ periodType, year, month }: UseGlobalSynthes
         par_canal: parCanal,
         par_categorie: parCategorie,
         quantite_vendue: totalQuantite,
-        cout_moyen_unitaire: coutMoyenUnitaire,
-        nb_produits_actifs: nbProduitsActifs,
-        previous: prevCaHt > 0 ? {
+        cout_moyen_unitaire: totalQuantite > 0 ? totalCoutProduction / totalQuantite : 0,
+        nb_produits_actifs: products.length,
+        previous: prevCaHt > 0 || prevMarge > 0 ? {
           ca_ht: prevCaHt,
           marge_brute: prevMarge,
-          cash_flow: prevCashFlowValue,
+          cash_flow: prevCashFlow,
         } : null,
         monthly_data: monthlyData,
         alerts: {

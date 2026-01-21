@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '@/contexts/ProjectContext';
-import { useMode } from '@/contexts/ModeContext';
 import { toast } from 'sonner';
 import { PriceCategory } from './useProductPrices';
 
@@ -43,17 +42,27 @@ export interface SalesData {
   };
 }
 
-export function useSales(month?: string) {
+/**
+ * Hook to manage sales data.
+ * 
+ * @param month - Optional month in format 'YYYY-MM-01'. Defaults to current month.
+ * @param mode - Optional mode ('simulation' | 'reel'). Defaults to 'simulation'.
+ */
+export function useSales(month?: string, mode: 'simulation' | 'reel' = 'simulation') {
   const { currentProject } = useProject();
-  const { mode } = useMode();
   const queryClient = useQueryClient();
   
   const currentMonth = month || new Date().toISOString().slice(0, 7) + '-01';
+
+  // Log mode usage for debugging
+  console.log('[useSales] Using mode:', mode, 'month:', currentMonth, 'project:', currentProject?.id);
 
   const { data: salesData = [], isLoading } = useQuery({
     queryKey: ['sales-data', currentProject?.id, currentMonth, mode],
     queryFn: async () => {
       if (!currentProject?.id) return [];
+
+      console.log('[useSales] Fetching sales with mode:', mode);
 
       // Fetch products
       const { data: products, error: productsError } = await supabase
@@ -178,6 +187,7 @@ export function useSales(month?: string) {
         };
       });
 
+      console.log('[useSales] Fetched', result.length, 'products with sales data');
       return result;
     },
     enabled: !!currentProject?.id,
@@ -258,16 +268,22 @@ export function useSales(month?: string) {
   };
 }
 
-// Hook for annual sales view
-export function useAnnualSales(year: number) {
+/**
+ * Hook for annual sales view.
+ * 
+ * @param year - The year to fetch sales for.
+ * @param mode - Optional mode ('simulation' | 'reel'). Defaults to 'simulation'.
+ */
+export function useAnnualSales(year: number, mode: 'simulation' | 'reel' = 'simulation') {
   const { currentProject } = useProject();
-  const { mode } = useMode();
   const queryClient = useQueryClient();
 
   const months = Array.from({ length: 12 }, (_, i) => {
     const m = (i + 1).toString().padStart(2, '0');
     return `${year}-${m}-01`;
   });
+
+  console.log('[useAnnualSales] Using mode:', mode, 'year:', year);
 
   const { data: annualData = [], isLoading } = useQuery({
     queryKey: ['annual-sales-data', currentProject?.id, year, mode],

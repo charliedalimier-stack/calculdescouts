@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '@/contexts/ProjectContext';
-import { useMode } from '@/contexts/ModeContext';
 import { useProjectSettings } from '@/hooks/useProjectSettings';
 import { toast } from 'sonner';
 import { useMemo } from 'react';
@@ -46,16 +45,26 @@ export interface ProductInsert {
   tva_taux?: number | null;
 }
 
-export function useProducts() {
+/**
+ * Hook to manage products with optional mode parameter.
+ * If mode is not provided, defaults to 'simulation' for backward compatibility.
+ * 
+ * @param mode - Optional mode ('simulation' | 'reel'). Defaults to 'simulation'.
+ */
+export function useProducts(mode: 'simulation' | 'reel' = 'simulation') {
   const { currentProject } = useProject();
-  const { mode } = useMode();
   const { settings } = useProjectSettings();
   const queryClient = useQueryClient();
+
+  // Log mode usage for debugging
+  console.log('[useProducts] Using mode:', mode, 'for project:', currentProject?.id);
 
   const { data: products = [], isLoading, error } = useQuery({
     queryKey: ['products', currentProject?.id, mode],
     queryFn: async () => {
       if (!currentProject?.id) return [];
+      
+      console.log('[useProducts] Fetching products with mode:', mode);
       
       const { data, error } = await supabase
         .from('products')
@@ -65,6 +74,7 @@ export function useProducts() {
         .order('nom_produit');
       
       if (error) throw error;
+      console.log('[useProducts] Fetched', data?.length || 0, 'products for mode:', mode);
       return data;
     },
     enabled: !!currentProject?.id,

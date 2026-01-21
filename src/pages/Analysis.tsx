@@ -28,9 +28,20 @@ import { DEFINITIONS } from "@/lib/pedagogicDefinitions";
 import { PeriodSelector, DataMode } from "@/components/layout/PeriodSelector";
 import { getCurrentYear } from "@/lib/dateOptions";
 
+// Convert DataMode to product/sales mode
+const mapDataModeToProductMode = (mode: DataMode): 'simulation' | 'reel' => {
+  return mode === 'budget' ? 'simulation' : 'reel';
+};
+
 const Analysis = () => {
   const [selectedYear, setSelectedYear] = useState(getCurrentYear());
   const [dataMode, setDataMode] = useState<DataMode>('budget');
+
+  // Convert DataMode to the mode expected by hooks
+  const productMode = mapDataModeToProductMode(dataMode);
+
+  // Log current mode for debugging
+  console.log('[Analysis] Current dataMode:', dataMode, '-> productMode:', productMode);
 
   const handlePeriodChange = ({ year, mode }: { month?: number; year: number; mode: DataMode }) => {
     console.log('[Analysis] Period changed:', { year, mode });
@@ -38,8 +49,8 @@ const Analysis = () => {
     setDataMode(mode);
   };
 
-  const { productsWithCosts, isLoadingWithCosts } = useProducts();
-  const { salesData, isLoading: isLoadingSales } = useSales();
+  const { productsWithCosts, isLoadingWithCosts } = useProducts(productMode);
+  const { salesData, isLoading: isLoadingSales } = useSales(undefined, productMode);
   const { settings, isLoading: isLoadingSettings } = useProjectSettings();
 
   // Get coefficient thresholds from settings (single source of truth)

@@ -354,6 +354,8 @@ export function useMonthlyDistribution(year: number) {
     queryFn: async () => {
       if (!currentProject?.id) return { monthly: [], byChannel: [] };
 
+      console.log('[useMonthlyDistribution] Fetching data for year:', year);
+
       // 1. Load BUDGET coefficients
       const { data: budgetCoefData } = await supabase
         .from('seasonality_coefficients')
@@ -376,7 +378,10 @@ export function useMonthlyDistribution(year: number) {
       const budgetCoefficients = getCoefArrayFromData(budgetCoefData);
       const reelCoefficients = getCoefArrayFromData(reelCoefData);
 
-      // 3. Fetch BUDGET annual sales
+      console.log('[useMonthlyDistribution] Budget coefficients:', budgetCoefficients);
+      console.log('[useMonthlyDistribution] Reel coefficients:', reelCoefficients);
+
+      // 3. Fetch BUDGET annual sales (mode = 'budget')
       const { data: budgetSales } = await supabase
         .from('annual_sales')
         .select('*')
@@ -384,13 +389,16 @@ export function useMonthlyDistribution(year: number) {
         .eq('year', year)
         .eq('mode', 'budget');
 
-      // 4. Fetch REEL annual sales
+      // 4. Fetch REEL annual sales (mode = 'reel')
       const { data: reelSales } = await supabase
         .from('annual_sales')
         .select('*')
         .eq('project_id', currentProject.id)
         .eq('year', year)
         .eq('mode', 'reel');
+
+      console.log('[useMonthlyDistribution] Budget sales count:', budgetSales?.length || 0, budgetSales);
+      console.log('[useMonthlyDistribution] Reel sales count:', reelSales?.length || 0, reelSales);
 
       // 5. Collect unique product IDs
       const allProductIds = [...new Set([
@@ -482,6 +490,11 @@ export function useMonthlyDistribution(year: number) {
         const ecartCa = reelCa - budgetCa;
         const ecartPercent = budgetCa > 0 ? ((reelCa - budgetCa) / budgetCa) * 100 : 0;
 
+        // Log first month only to avoid spam
+        if (i === 0) {
+          console.log(`[useMonthlyDistribution] Month ${i + 1} - Budget: qty=${budgetQty}, ca=${budgetCa.toFixed(2)} | Reel: qty=${reelQty}, ca=${reelCa.toFixed(2)}`);
+        }
+
         monthly.push({
           month: monthStr,
           month_label: MONTH_LABELS[i],
@@ -543,6 +556,14 @@ export function useMonthlyDistribution(year: number) {
     get ecart_ca() { return this.reel_ca - this.budget_ca; },
     get ecart_percent() { return this.budget_ca > 0 ? ((this.reel_ca - this.budget_ca) / this.budget_ca) * 100 : 0; },
   };
+
+  // Log totals for debugging
+  console.log('[useMonthlyDistribution] Totals:', {
+    budget_qty: totals.budget_qty,
+    reel_qty: totals.reel_qty,
+    budget_ca: totals.budget_ca,
+    reel_ca: totals.reel_ca,
+  });
 
   return {
     monthly: data?.monthly || [],

@@ -363,8 +363,8 @@ const Analysis = () => {
 
       {/* Margin and Category Charts */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <MarginChart />
-        <CategoryPieChart />
+        <MarginChart mode={productMode} />
+        <CategoryPieChart year={selectedYear} mode={dataMode} />
       </div>
 
       {/* Insights */}

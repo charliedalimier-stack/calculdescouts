@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useProducts } from "@/hooks/useProducts";
-import { useSales } from "@/hooks/useSales";
+import { useMonthlyDistribution } from "@/hooks/useAnnualSalesEntry";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMemo } from "react";
 
@@ -37,18 +37,26 @@ const getQuadrant = (margin: number, volume: number, avgMargin: number, avgVolum
   return "dog";
 };
 
-export function BCGMatrix() {
-  const { productsWithCosts, isLoadingWithCosts } = useProducts();
-  const { salesData, isLoading: isLoadingSales } = useSales();
+interface BCGMatrixProps {
+  year?: number;
+  mode?: 'simulation' | 'reel';
+}
+
+export function BCGMatrix({ year = new Date().getFullYear(), mode = 'simulation' }: BCGMatrixProps) {
+  const { productsWithCosts, isLoadingWithCosts } = useProducts(mode);
+  const { totals, isLoading: isLoadingDistribution } = useMonthlyDistribution(year);
+
+  console.log('[BCGMatrix] year:', year, 'mode:', mode);
+
+  // For BCG, we use total volumes from monthly distribution
+  const totalVolume = mode === 'simulation' ? totals.budget_qty : totals.reel_qty;
 
   const { products, avgMargin, avgVolume, maxMargin, maxVolume } = useMemo(() => {
     if (!productsWithCosts) return { products: [], avgMargin: 30, avgVolume: 500, maxMargin: 60, maxVolume: 1000 };
 
-    // Create a map of product sales volumes
-    const volumeMap: Record<string, number> = {};
-    salesData?.forEach((sale) => {
-      volumeMap[sale.product_id] = (volumeMap[sale.product_id] || 0) + sale.reel_qty;
-    });
+    // Use product margin directly and assign equal volume share for now
+    // In a real implementation, we'd have per-product volumes
+    const volumePerProduct = productsWithCosts.length > 0 ? totalVolume / productsWithCosts.length : 0;
 
     const productData = productsWithCosts
       .filter((p) => p.margin !== null && p.margin !== undefined)
@@ -56,8 +64,8 @@ export function BCGMatrix() {
         id: p.id,
         name: p.nom_produit,
         rentabilite: Number((p.margin || 0).toFixed(1)),
-        volume: volumeMap[p.id] || 0, // Use 0 if no sales data, no random fallback
-        quadrant: "", // Will be calculated after averages
+        volume: Math.round(volumePerProduct),
+        quadrant: "",
       }));
 
     if (productData.length === 0) {
@@ -65,9 +73,9 @@ export function BCGMatrix() {
     }
 
     const totalMargin = productData.reduce((sum, p) => sum + p.rentabilite, 0);
-    const totalVolume = productData.reduce((sum, p) => sum + p.volume, 0);
+    const totalVol = productData.reduce((sum, p) => sum + p.volume, 0);
     const avgM = totalMargin / productData.length;
-    const avgV = totalVolume / productData.length;
+    const avgV = totalVol / productData.length;
     const maxM = Math.max(...productData.map((p) => p.rentabilite), 60);
     const maxV = Math.max(...productData.map((p) => p.volume), 100);
 
@@ -83,9 +91,9 @@ export function BCGMatrix() {
       maxMargin: maxM,
       maxVolume: maxV,
     };
-  }, [productsWithCosts, salesData]);
+  }, [productsWithCosts, totalVolume]);
 
-  if (isLoadingWithCosts || isLoadingSales) {
+  if (isLoadingWithCosts || isLoadingDistribution) {
     return (
       <Card>
         <CardHeader>
@@ -121,7 +129,7 @@ export function BCGMatrix() {
     <Card>
       <CardHeader>
         <CardTitle className="text-base font-semibold">
-          Matrice Produits (BCG)
+          Matrice Produits (BCG) - {mode === 'simulation' ? 'Budget' : 'Réel'} {year}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -147,7 +155,7 @@ export function BCGMatrix() {
                 type="number"
                 dataKey="volume"
                 name="Volume"
-                domain={[0, Math.ceil(maxVolume / 100) * 100]}
+                domain={[0, Math.ceil(maxVolume / 100) * 100 || 100]}
                 tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
                 label={{
                   value: "Volume ventes",

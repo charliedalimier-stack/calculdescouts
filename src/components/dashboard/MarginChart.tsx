@@ -18,8 +18,14 @@ const getBarColor = (margin: number) => {
   return "hsl(var(--destructive))";
 };
 
-export function MarginChart() {
-  const { productsWithCosts, isLoadingWithCosts } = useProducts();
+interface MarginChartProps {
+  mode?: 'simulation' | 'reel';
+}
+
+export function MarginChart({ mode = 'simulation' }: MarginChartProps) {
+  const { productsWithCosts, isLoadingWithCosts } = useProducts(mode);
+
+  console.log('[MarginChart] mode:', mode, 'products:', productsWithCosts?.length);
 
   const data = productsWithCosts
     ?.filter((p) => p.margin !== null && p.margin !== undefined)

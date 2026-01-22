@@ -161,7 +161,7 @@ const Matrix = () => {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <BCGMatrix />
+        <BCGMatrix year={selectedYear} mode={productMode} />
 
         <Card>
           <CardHeader>

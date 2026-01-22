@@ -256,19 +256,19 @@ const Index = () => {
 
       {/* Main Charts */}
       <div className="mb-8 grid gap-6 lg:grid-cols-3">
-        <SalesChart />
-        <ProductAlerts />
+        <SalesChart year={selectedYear} />
+        <ProductAlerts mode={productMode} />
       </div>
 
       {/* Secondary Charts */}
       <div className="mb-8 grid gap-6 lg:grid-cols-2">
-        <MarginChart />
-        <CategoryPieChart />
+        <MarginChart mode={productMode} />
+        <CategoryPieChart year={selectedYear} mode={dataMode} />
       </div>
 
       {/* BCG Matrix */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <BCGMatrix />
+        <BCGMatrix year={selectedYear} mode={productMode} />
         <div className="rounded-lg border border-border bg-card p-6">
           <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-foreground">
             <ChefHat className="h-5 w-5 text-primary" />

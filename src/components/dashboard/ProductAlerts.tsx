@@ -36,9 +36,15 @@ const getAlertStyles = (type: Alert["type"]) => {
   }
 };
 
-export function ProductAlerts() {
-  const { productsWithCosts, isLoadingWithCosts } = useProducts();
+interface ProductAlertsProps {
+  mode?: 'simulation' | 'reel';
+}
+
+export function ProductAlerts({ mode = 'simulation' }: ProductAlertsProps) {
+  const { productsWithCosts, isLoadingWithCosts } = useProducts(mode);
   const { settings, isLoading: isLoadingSettings } = useProjectSettings();
+
+  console.log('[ProductAlerts] mode:', mode, 'products:', productsWithCosts?.length);
 
   const isLoading = isLoadingWithCosts || isLoadingSettings;
 

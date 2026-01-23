@@ -167,18 +167,24 @@ export function useStocks() {
   const packagingStocks = stocks.filter((s) => s.type_stock === "packaging");
   const productStocks = stocks.filter((s) => s.type_stock === "product");
 
-  // Add stock
+  // Add stock - valeur_totale is calculated on read, not stored
   const addStock = useMutation({
     mutationFn: async (stock: StockInsert) => {
       if (!projectId) throw new Error("Aucun projet sélectionné");
 
+      // Only send required fields, exclude valeur_totale (calculated field)
       const { data, error } = await supabase
         .from("stocks")
         .insert({
-          ...stock,
+          type_stock: stock.type_stock,
+          ingredient_id: stock.ingredient_id || null,
+          packaging_id: stock.packaging_id || null,
+          product_id: stock.product_id || null,
+          quantite: stock.quantite,
+          cout_unitaire: stock.cout_unitaire,
+          seuil_alerte: stock.seuil_alerte || 0,
           project_id: projectId,
           mode,
-          valeur_totale: stock.quantite * stock.cout_unitaire,
         })
         .select()
         .single();
@@ -199,21 +205,27 @@ export function useStocks() {
     },
   });
 
-  // Update stock
+  // Update stock - only update source fields, not calculated valeur_totale
   const updateStock = useMutation({
     mutationFn: async ({
       id,
-      ...updates
-    }: Partial<Stock> & { id: string }) => {
+      quantite,
+      cout_unitaire,
+      seuil_alerte,
+    }: {
+      id: string;
+      quantite?: number;
+      cout_unitaire?: number;
+      seuil_alerte?: number;
+    }) => {
+      const updateData: Record<string, number | undefined> = {};
+      if (quantite !== undefined) updateData.quantite = quantite;
+      if (cout_unitaire !== undefined) updateData.cout_unitaire = cout_unitaire;
+      if (seuil_alerte !== undefined) updateData.seuil_alerte = seuil_alerte;
+
       const { data, error } = await supabase
         .from("stocks")
-        .update({
-          ...updates,
-          valeur_totale:
-            updates.quantite !== undefined && updates.cout_unitaire !== undefined
-              ? updates.quantite * updates.cout_unitaire
-              : undefined,
-        })
+        .update(updateData)
         .eq("id", id)
         .select()
         .single();
@@ -272,13 +284,10 @@ export function useStocks() {
         throw new Error("Stock insuffisant");
       }
 
-      // Update stock quantity
+      // Update stock quantity only (valeur_totale is calculated on read)
       const { error: updateError } = await supabase
         .from("stocks")
-        .update({
-          quantite: newQuantite,
-          valeur_totale: newQuantite * currentStock.cout_unitaire,
-        })
+        .update({ quantite: newQuantite })
         .eq("id", stock_id);
 
       if (updateError) throw updateError;

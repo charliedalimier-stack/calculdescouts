@@ -165,7 +165,7 @@ export function useStocks() {
   // Group stocks by type
   const ingredientStocks = stocks.filter((s) => s.type_stock === "ingredient");
   const packagingStocks = stocks.filter((s) => s.type_stock === "packaging");
-  const productStocks = stocks.filter((s) => s.type_stock === "product");
+  const productStocks = stocks.filter((s) => s.type_stock === "produit_fini");
 
   // Add stock - valeur_totale is calculated on read, not stored
   const addStock = useMutation({
@@ -342,7 +342,7 @@ export function useStocks() {
 
       // Find product stock
       const productStock = stocks.find(
-        (s) => s.type_stock === "product" && s.product_id === product_id
+        (s) => s.type_stock === "produit_fini" && s.product_id === product_id
       );
 
       if (productStock) {

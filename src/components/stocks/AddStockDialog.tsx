@@ -17,7 +17,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { StockInsert } from "@/hooks/useStocks";
-import { Package } from "lucide-react";
+import { Package, Loader2 } from "lucide-react";
+import { calculateProductCostRecursive } from "@/hooks/useSubRecipes";
 
 interface Ingredient {
   id: string;
@@ -62,6 +63,7 @@ export function AddStockDialog({
 
   const [selectedItemId, setSelectedItemId] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCalculatingCost, setIsCalculatingCost] = useState(false);
 
   // Reset form when dialog opens
   useEffect(() => {
@@ -89,13 +91,12 @@ export function AddStockDialog({
     setSelectedItemId("");
   };
 
-  const handleItemChange = (id: string) => {
+  const handleItemChange = async (id: string) => {
     setSelectedItemId(id);
 
-    let cost = 0;
     if (formData.type_stock === "ingredient") {
       const item = ingredients.find((i) => i.id === id);
-      cost = item?.cout_unitaire || 0;
+      const cost = item?.cout_unitaire || 0;
       setFormData({
         ...formData,
         ingredient_id: id,
@@ -105,7 +106,7 @@ export function AddStockDialog({
       });
     } else if (formData.type_stock === "packaging") {
       const item = packaging.find((p) => p.id === id);
-      cost = item?.cout_unitaire || 0;
+      const cost = item?.cout_unitaire || 0;
       setFormData({
         ...formData,
         packaging_id: id,
@@ -114,12 +115,28 @@ export function AddStockDialog({
         cout_unitaire: cost,
       });
     } else {
+      // For products, calculate cost automatically from recipe
       setFormData({
         ...formData,
         product_id: id,
         ingredient_id: null,
         packaging_id: null,
+        cout_unitaire: 0,
       });
+      
+      // Calculate product cost from recipe + packaging + variable costs
+      setIsCalculatingCost(true);
+      try {
+        const calculatedCost = await calculateProductCostRecursive(id);
+        setFormData((prev) => ({
+          ...prev,
+          cout_unitaire: calculatedCost,
+        }));
+      } catch (error) {
+        console.error("Error calculating product cost:", error);
+      } finally {
+        setIsCalculatingCost(false);
+      }
     }
   };
 
@@ -221,20 +238,39 @@ export function AddStockDialog({
             </div>
 
             <div>
-              <Label>Coût unitaire (€)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.cout_unitaire || ""}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    cout_unitaire: parseFloat(e.target.value) || 0,
-                  })
-                }
-                placeholder="0.00"
-              />
+              <Label>
+                Coût unitaire (€)
+                {formData.type_stock === "product" && (
+                  <span className="text-xs text-muted-foreground ml-2">
+                    (calculé automatiquement)
+                  </span>
+                )}
+              </Label>
+              <div className="relative">
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.cout_unitaire || ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      cout_unitaire: parseFloat(e.target.value) || 0,
+                    })
+                  }
+                  placeholder="0.00"
+                  disabled={isCalculatingCost}
+                  className={formData.type_stock === "product" ? "bg-muted" : ""}
+                />
+                {isCalculatingCost && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                )}
+              </div>
+              {formData.type_stock === "product" && formData.cout_unitaire > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Coût de revient: recette + emballages + coûts variables
+                </p>
+              )}
             </div>
           </div>
 

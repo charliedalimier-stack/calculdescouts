@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useProducts } from "@/hooks/useProducts";
-import { useMonthlyDistribution } from "@/hooks/useAnnualSalesEntry";
+import { useProductSalesAnalysis } from "@/hooks/useAnnualSalesEntry";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMemo } from "react";
 
@@ -44,19 +44,24 @@ interface BCGMatrixProps {
 
 export function BCGMatrix({ year = new Date().getFullYear(), mode = 'simulation' }: BCGMatrixProps) {
   const { productsWithCosts, isLoadingWithCosts } = useProducts(mode);
-  const { totals, isLoading: isLoadingDistribution } = useMonthlyDistribution(year);
+  const { productSales, isLoading: isLoadingSales } = useProductSalesAnalysis(year);
 
-  console.log('[BCGMatrix] year:', year, 'mode:', mode);
+  // Convert mode to data mode for selecting correct sales data
+  const dataMode = mode === 'simulation' ? 'budget' : 'reel';
 
-  // For BCG, we use total volumes from monthly distribution
-  const totalVolume = mode === 'simulation' ? totals.budget_qty : totals.reel_qty;
+  console.log('[BCGMatrix] year:', year, 'mode:', mode, 'dataMode:', dataMode, 'productSales:', productSales?.length);
 
   const { products, avgMargin, avgVolume, maxMargin, maxVolume } = useMemo(() => {
-    if (!productsWithCosts) return { products: [], avgMargin: 30, avgVolume: 500, maxMargin: 60, maxVolume: 1000 };
+    if (!productsWithCosts || !productSales || productSales.length === 0) {
+      return { products: [], avgMargin: 30, avgVolume: 500, maxMargin: 60, maxVolume: 1000 };
+    }
 
-    // Use product margin directly and assign equal volume share for now
-    // In a real implementation, we'd have per-product volumes
-    const volumePerProduct = productsWithCosts.length > 0 ? totalVolume / productsWithCosts.length : 0;
+    // Create volume map from productSales based on mode
+    const volumeMap: Record<string, number> = {};
+    productSales.forEach((sale) => {
+      const volume = dataMode === 'budget' ? sale.budget_qty : sale.reel_qty;
+      volumeMap[sale.product_id] = (volumeMap[sale.product_id] || 0) + volume;
+    });
 
     const productData = productsWithCosts
       .filter((p) => p.margin !== null && p.margin !== undefined)
@@ -64,7 +69,7 @@ export function BCGMatrix({ year = new Date().getFullYear(), mode = 'simulation'
         id: p.id,
         name: p.nom_produit,
         rentabilite: Number((p.margin || 0).toFixed(1)),
-        volume: Math.round(volumePerProduct),
+        volume: volumeMap[p.id] || 0,
         quadrant: "",
       }));
 
@@ -91,9 +96,9 @@ export function BCGMatrix({ year = new Date().getFullYear(), mode = 'simulation'
       maxMargin: maxM,
       maxVolume: maxV,
     };
-  }, [productsWithCosts, totalVolume]);
+  }, [productsWithCosts, productSales, dataMode]);
 
-  if (isLoadingWithCosts || isLoadingDistribution) {
+  if (isLoadingWithCosts || isLoadingSales) {
     return (
       <Card>
         <CardHeader>

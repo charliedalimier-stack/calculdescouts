@@ -19,7 +19,7 @@ import {
 } from "recharts";
 import { BarChart3, TrendingUp, AlertCircle } from "lucide-react";
 import { useProducts } from "@/hooks/useProducts";
-import { useSales } from "@/hooks/useSales";
+import { useProductSalesAnalysis } from "@/hooks/useAnnualSalesEntry";
 import { useProjectSettings } from "@/hooks/useProjectSettings";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMemo } from "react";
@@ -50,31 +50,38 @@ const Analysis = () => {
   };
 
   const { productsWithCosts, isLoadingWithCosts } = useProducts(productMode);
-  const { salesData, isLoading: isLoadingSales } = useSales(undefined, productMode);
+  const { productSales, isLoading: isLoadingSales } = useProductSalesAnalysis(selectedYear);
   const { settings, isLoading: isLoadingSettings } = useProjectSettings();
 
   // Get coefficient thresholds from settings (single source of truth)
   const coefficientCible = settings?.coefficient_cible ?? 2.5;
   const coefficientMin = settings?.coefficient_min ?? 2.0;
 
-  // Pareto analysis - calculate CA by product
+  // Pareto analysis - calculate CA by product using annual sales data
   const paretoData = useMemo(() => {
-    if (!productsWithCosts || !salesData) return [];
+    if (!productsWithCosts || !productSales || productSales.length === 0) return [];
+
+    console.log('[Analysis] Pareto - productSales:', productSales.length, 'mode:', dataMode);
 
     const productCA: Record<string, { name: string; ca: number }> = {};
 
-    salesData.forEach((sale) => {
+    // Use budget or reel CA based on selected mode
+    productSales.forEach((sale) => {
       const product = productsWithCosts.find((p) => p.id === sale.product_id);
       if (product) {
+        const ca = dataMode === 'budget' ? sale.budget_ca : sale.reel_ca;
         if (!productCA[product.id]) {
           productCA[product.id] = { name: product.nom_produit, ca: 0 };
         }
-        productCA[product.id].ca += sale.reel_ca;
+        productCA[product.id].ca += ca;
       }
     });
 
     // Sort by CA descending
-    const sorted = Object.values(productCA).sort((a, b) => b.ca - a.ca);
+    const sorted = Object.values(productCA)
+      .filter(p => p.ca > 0) // Only include products with sales
+      .sort((a, b) => b.ca - a.ca);
+    
     const total = sorted.reduce((sum, p) => sum + p.ca, 0);
 
     // Calculate cumulative percent
@@ -87,7 +94,7 @@ const Analysis = () => {
         cumulPercent: total > 0 ? Math.round((cumul / total) * 100) : 0,
       };
     }).slice(0, 8);
-  }, [productsWithCosts, salesData]);
+  }, [productsWithCosts, productSales, dataMode]);
 
   // Coefficient dispersion data - using settings thresholds
   const coefficientData = useMemo(() => {

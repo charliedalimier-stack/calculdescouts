@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Target, Lightbulb, Info } from "lucide-react";
 import { useProducts } from "@/hooks/useProducts";
-import { useSales } from "@/hooks/useSales";
+import { useProductSalesAnalysis } from "@/hooks/useAnnualSalesEntry";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
@@ -45,18 +45,21 @@ const Matrix = () => {
   };
 
   const { productsWithCosts, isLoadingWithCosts } = useProducts(productMode);
-  const { salesData, isLoading: isLoadingSales } = useSales(undefined, productMode);
+  const { productSales, isLoading: isLoadingSales } = useProductSalesAnalysis(selectedYear);
 
   // Group real products by BCG quadrant
   const productsByQuadrant = useMemo(() => {
-    if (!productsWithCosts || !salesData) {
+    if (!productsWithCosts || !productSales || productSales.length === 0) {
       return { star: [], cashcow: [], dilemma: [], dog: [] };
     }
 
-    // Create a map of product sales volumes
+    console.log('[Matrix] productSales:', productSales.length, 'mode:', dataMode);
+
+    // Create a map of product sales volumes based on mode
     const volumeMap: Record<string, number> = {};
-    salesData.forEach((sale) => {
-      volumeMap[sale.product_id] = (volumeMap[sale.product_id] || 0) + sale.reel_qty;
+    productSales.forEach((sale) => {
+      const volume = dataMode === 'budget' ? sale.budget_qty : sale.reel_qty;
+      volumeMap[sale.product_id] = (volumeMap[sale.product_id] || 0) + volume;
     });
 
     const productData = productsWithCosts
@@ -91,7 +94,7 @@ const Matrix = () => {
     });
 
     return grouped;
-  }, [productsWithCosts, salesData]);
+  }, [productsWithCosts, productSales, dataMode]);
 
   const isLoading = isLoadingWithCosts || isLoadingSales;
 

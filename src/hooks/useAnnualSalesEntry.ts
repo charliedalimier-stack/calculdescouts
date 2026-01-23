@@ -572,3 +572,138 @@ export function useMonthlyDistribution(year: number) {
     isLoading,
   };
 }
+
+// Interface for product-level sales analysis
+export interface ProductSalesAnalysis {
+  product_id: string;
+  product_name: string;
+  category_name: string | null;
+  budget_qty: number;
+  reel_qty: number;
+  budget_ca: number;
+  reel_ca: number;
+}
+
+/**
+ * Hook for product-level sales analysis (for Pareto, BCG, etc.)
+ * Returns sales data aggregated by product for the specified year.
+ */
+export function useProductSalesAnalysis(year: number) {
+  const { currentProject } = useProject();
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['product-sales-analysis', currentProject?.id, year],
+    queryFn: async () => {
+      if (!currentProject?.id) return [];
+
+      console.log('[useProductSalesAnalysis] Fetching product sales for year:', year);
+
+      // Fetch BUDGET annual sales
+      const { data: budgetSales } = await supabase
+        .from('annual_sales')
+        .select('*')
+        .eq('project_id', currentProject.id)
+        .eq('year', year)
+        .eq('mode', 'budget');
+
+      // Fetch REEL annual sales
+      const { data: reelSales } = await supabase
+        .from('annual_sales')
+        .select('*')
+        .eq('project_id', currentProject.id)
+        .eq('year', year)
+        .eq('mode', 'reel');
+
+      // Collect unique product IDs
+      const allProductIds = [...new Set([
+        ...(budgetSales || []).map(s => s.product_id),
+        ...(reelSales || []).map(s => s.product_id),
+      ])];
+
+      if (allProductIds.length === 0) {
+        console.log('[useProductSalesAnalysis] No sales data found');
+        return [];
+      }
+
+      // Fetch products with categories
+      const { data: products } = await supabase
+        .from('products')
+        .select('id, nom_produit, prix_btc, categories(nom_categorie)')
+        .in('id', allProductIds);
+
+      // Fetch product prices
+      const { data: prices } = await supabase
+        .from('product_prices')
+        .select('*')
+        .in('product_id', allProductIds)
+        .eq('mode', 'simulation');
+
+      // Helper: get price for a product/category
+      const getPrice = (productId: string, category: string): number => {
+        const price = (prices || []).find(
+          p => p.product_id === productId && p.categorie_prix === category
+        );
+        if (price) return Number(price.prix_ht);
+        
+        const product = (products || []).find(p => p.id === productId);
+        const prixBtc = Number(product?.prix_btc || 0);
+        
+        if (category === 'BTC') return prixBtc;
+        if (category === 'BTB') return prixBtc * 0.7;
+        return prixBtc * 0.7 * 0.85; // Distributeur
+      };
+
+      // Aggregate by product
+      const productMap = new Map<string, ProductSalesAnalysis>();
+
+      // Initialize with all products
+      (products || []).forEach(product => {
+        productMap.set(product.id, {
+          product_id: product.id,
+          product_name: product.nom_produit,
+          category_name: (product.categories as any)?.nom_categorie || null,
+          budget_qty: 0,
+          reel_qty: 0,
+          budget_ca: 0,
+          reel_ca: 0,
+        });
+      });
+
+      // Add budget sales
+      (budgetSales || []).forEach(sale => {
+        const existing = productMap.get(sale.product_id);
+        if (existing) {
+          const qty = Number(sale.quantite_annuelle) || 0;
+          const prix = sale.prix_ht_override 
+            ? Number(sale.prix_ht_override) 
+            : getPrice(sale.product_id, sale.categorie_prix);
+          existing.budget_qty += qty;
+          existing.budget_ca += qty * prix;
+        }
+      });
+
+      // Add reel sales
+      (reelSales || []).forEach(sale => {
+        const existing = productMap.get(sale.product_id);
+        if (existing) {
+          const qty = Number(sale.quantite_annuelle) || 0;
+          const prix = sale.prix_ht_override 
+            ? Number(sale.prix_ht_override) 
+            : getPrice(sale.product_id, sale.categorie_prix);
+          existing.reel_qty += qty;
+          existing.reel_ca += qty * prix;
+        }
+      });
+
+      const result = Array.from(productMap.values());
+      console.log('[useProductSalesAnalysis] Found', result.length, 'products with sales');
+      return result;
+    },
+    enabled: !!currentProject?.id,
+  });
+
+  return {
+    productSales: data || [],
+    isLoading,
+  };
+}

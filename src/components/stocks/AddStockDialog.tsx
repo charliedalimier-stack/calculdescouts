@@ -114,7 +114,7 @@ export function AddStockDialog({
         product_id: null,
         cout_unitaire: cost,
       });
-    } else {
+    } else if (formData.type_stock === "produit_fini") {
       // For products, calculate cost automatically from recipe
       setFormData({
         ...formData,
@@ -160,7 +160,7 @@ export function AddStockDialog({
         return ingredients.map((i) => ({ id: i.id, name: i.nom_ingredient }));
       case "packaging":
         return packaging.map((p) => ({ id: p.id, name: p.nom }));
-      case "product":
+      case "produit_fini":
         return products.map((p) => ({ id: p.id, name: p.nom_produit }));
       default:
         return [];
@@ -191,7 +191,7 @@ export function AddStockDialog({
               <SelectContent>
                 <SelectItem value="ingredient">Ingrédient</SelectItem>
                 <SelectItem value="packaging">Emballage</SelectItem>
-                <SelectItem value="product">Produit fini</SelectItem>
+                <SelectItem value="produit_fini">Produit fini</SelectItem>
               </SelectContent>
             </Select>
           </div>

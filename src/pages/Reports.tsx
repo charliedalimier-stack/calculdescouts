@@ -2,21 +2,24 @@ import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { FinancialReport } from "@/components/reports/FinancialReport";
 import { ProductReport } from "@/components/reports/ProductReport";
 import { SalesReport } from "@/components/reports/SalesReport";
 import { StockReport } from "@/components/reports/StockReport";
-import { getYearOptions, getCurrentYear } from "@/lib/dateOptions";
-import { useMode } from "@/contexts/ModeContext";
-import { FileText, Package, TrendingUp, Warehouse, Download, Printer } from "lucide-react";
+import { getCurrentYear } from "@/lib/dateOptions";
+import { PeriodSelector, DataMode } from "@/components/layout/PeriodSelector";
+import { FileText, Package, TrendingUp, Warehouse, Printer } from "lucide-react";
 
 export default function Reports() {
-  const [selectedYear, setSelectedYear] = useState(getCurrentYear().toString());
+  const [selectedYear, setSelectedYear] = useState(getCurrentYear());
   const [activeTab, setActiveTab] = useState("financial");
-  const { mode } = useMode();
-  const yearOptions = getYearOptions();
+  const [dataMode, setDataMode] = useState<DataMode>("budget");
+
+  const handlePeriodChange = ({ year, mode }: { year: number; mode: DataMode }) => {
+    setSelectedYear(year);
+    setDataMode(mode);
+  };
 
   const handlePrint = () => {
     window.print();
@@ -37,22 +40,16 @@ export default function Reports() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Rapports thématiques</h1>
             <p className="text-muted-foreground">
-              Analyses détaillées par domaine • Mode: <span className="font-medium capitalize">{mode}</span>
+              Analyses détaillées par domaine
             </p>
           </div>
           <div className="flex items-center gap-4">
-            <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="w-[120px]">
-                <SelectValue placeholder="Année" />
-              </SelectTrigger>
-              <SelectContent>
-                {yearOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <PeriodSelector
+              year={selectedYear}
+              mode={dataMode}
+              showMonth={false}
+              onChange={handlePeriodChange}
+            />
             <Button variant="outline" size="icon" onClick={handlePrint}>
               <Printer className="h-4 w-4" />
             </Button>
@@ -105,7 +102,7 @@ export default function Reports() {
                 </CardDescription>
               </CardHeader>
             </Card>
-            <FinancialReport year={parseInt(selectedYear)} />
+            <FinancialReport year={selectedYear} mode={dataMode} />
           </TabsContent>
 
           <TabsContent value="products" className="space-y-4">
@@ -113,14 +110,14 @@ export default function Reports() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Package className="h-5 w-5" />
-                  Rapport Produits
+                  Rapport Produits {selectedYear}
                 </CardTitle>
                 <CardDescription>
                   Analyse de la rentabilité produit : coûts de revient, coefficients, contributions à la marge
                 </CardDescription>
               </CardHeader>
             </Card>
-            <ProductReport />
+            <ProductReport year={selectedYear} mode={dataMode} />
           </TabsContent>
 
           <TabsContent value="sales" className="space-y-4">
@@ -135,7 +132,7 @@ export default function Reports() {
                 </CardDescription>
               </CardHeader>
             </Card>
-            <SalesReport year={parseInt(selectedYear)} />
+            <SalesReport year={selectedYear} mode={dataMode} />
           </TabsContent>
 
           <TabsContent value="stocks" className="space-y-4">
@@ -150,7 +147,7 @@ export default function Reports() {
                 </CardDescription>
               </CardHeader>
             </Card>
-            <StockReport />
+            <StockReport mode={dataMode} />
           </TabsContent>
         </Tabs>
       </div>

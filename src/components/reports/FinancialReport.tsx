@@ -4,7 +4,8 @@ import { useFinancialReport } from "@/hooks/useReports";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { DEFINITIONS } from "@/lib/pedagogicDefinitions";
 import { MONTH_LABELS_FULL } from "@/lib/dateOptions";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -19,6 +20,7 @@ import {
 
 interface FinancialReportProps {
   year: number;
+  mode: 'budget' | 'reel';
 }
 
 const formatCurrency = (value: number) => {
@@ -40,11 +42,25 @@ const TrendIcon = ({ value }: { value: number }) => {
   return <Minus className="h-4 w-4 text-muted-foreground" />;
 };
 
-export function FinancialReport({ year }: FinancialReportProps) {
-  const { data: financialData, isLoading } = useFinancialReport(year);
+export function FinancialReport({ year, mode }: FinancialReportProps) {
+  const { data: financialData, isLoading } = useFinancialReport(year, mode);
 
   if (isLoading) {
     return <div className="flex items-center justify-center p-8">Chargement...</div>;
+  }
+
+  const hasData = financialData && financialData.some(d => d.ca_ht > 0);
+
+  if (!hasData) {
+    return (
+      <Alert>
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          Aucune donnée financière disponible pour {year} en mode {mode === 'budget' ? 'Budget' : 'Réel'}.
+          Ajoutez des ventes et des frais pour voir les rapports.
+        </AlertDescription>
+      </Alert>
+    );
   }
 
   const chartData = financialData?.map((d, index) => ({

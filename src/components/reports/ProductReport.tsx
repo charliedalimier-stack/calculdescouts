@@ -4,6 +4,8 @@ import { useProductReport } from "@/hooks/useReports";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { DEFINITIONS } from "@/lib/pedagogicDefinitions";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -15,8 +17,12 @@ import {
   Cell,
   PieChart,
   Pie,
-  Legend,
 } from "recharts";
+
+interface ProductReportProps {
+  year: number;
+  mode: 'budget' | 'reel';
+}
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('fr-FR', {
@@ -52,11 +58,23 @@ const getCoefficientBadge = (coef: number) => {
   return <Badge variant="destructive">À améliorer</Badge>;
 };
 
-export function ProductReport() {
-  const { data: productData, isLoading } = useProductReport();
+export function ProductReport({ year, mode }: ProductReportProps) {
+  const { data: productData, isLoading } = useProductReport(year, mode);
 
   if (isLoading) {
     return <div className="flex items-center justify-center p-8">Chargement...</div>;
+  }
+
+  if (!productData || productData.length === 0) {
+    return (
+      <Alert>
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          Aucun produit disponible pour {year} en mode {mode === 'budget' ? 'Budget' : 'Réel'}.
+          Ajoutez des produits et des ventes pour voir le rapport.
+        </AlertDescription>
+      </Alert>
+    );
   }
 
   const sortedByMargin = [...(productData || [])].sort((a, b) => b.contribution_marge - a.contribution_marge);

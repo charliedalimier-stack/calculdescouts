@@ -4,7 +4,8 @@ import { useStockReport } from "@/hooks/useReports";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { DEFINITIONS } from "@/lib/pedagogicDefinitions";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, CheckCircle, XCircle, Package, Apple, Box } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertTriangle, CheckCircle, XCircle, Package, Apple, Box, AlertCircle } from "lucide-react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -16,8 +17,11 @@ import {
   Cell,
   PieChart,
   Pie,
-  Legend,
 } from "recharts";
+
+interface StockReportProps {
+  mode: 'budget' | 'reel';
+}
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('fr-FR', {
@@ -74,11 +78,22 @@ const COLORS = [
   'hsl(var(--chart-4))',
 ];
 
-export function StockReport() {
-  const { data: stockData, isLoading } = useStockReport();
+export function StockReport({ mode }: StockReportProps) {
+  const { data: stockData, isLoading } = useStockReport(mode);
 
   if (isLoading) {
     return <div className="flex items-center justify-center p-8">Chargement...</div>;
+  }
+
+  if (!stockData || stockData.length === 0) {
+    return (
+      <Alert>
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          Aucun stock disponible. Ajoutez des stocks pour voir le rapport.
+        </AlertDescription>
+      </Alert>
+    );
   }
 
   // Summary stats

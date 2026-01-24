@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useProject } from "@/contexts/ProjectContext";
-import { useMode } from "@/contexts/ModeContext";
 
 export interface FinancialReportData {
   periode: string;
@@ -51,9 +50,15 @@ export interface StockReportData {
   rotation: number;
 }
 
-export const useFinancialReport = (year: number) => {
+type ReportMode = 'budget' | 'reel';
+
+// Map 'budget' to database mode values
+const mapModeForProducts = (mode: ReportMode) => mode === 'budget' ? 'simulation' : 'reel';
+const mapModeForSales = (mode: ReportMode) => mode; // sales_targets use 'budget', sales_actuals use 'reel'
+
+export const useFinancialReport = (year: number, mode: ReportMode = 'budget') => {
   const { currentProject } = useProject();
-  const { mode } = useMode();
+  const dbMode = mapModeForProducts(mode);
 
   return useQuery({
     queryKey: ['financial-report', currentProject?.id, mode, year],
@@ -68,9 +73,10 @@ export const useFinancialReport = (year: number) => {
         .from('products')
         .select('id, nom_produit')
         .eq('project_id', currentProject.id)
-        .eq('mode', mode);
+        .eq('mode', dbMode);
 
-      // Fetch sales data
+      // For financial report, use annual_sales first then calculate monthly distribution
+      // Or use sales_targets for budget, sales_actuals for reel
       const salesTable = mode === 'reel' ? 'sales_actuals' : 'sales_targets';
       const quantityField = mode === 'reel' ? 'quantite_reelle' : 'quantite_objectif';
       
@@ -78,7 +84,6 @@ export const useFinancialReport = (year: number) => {
         .from(salesTable)
         .select('*')
         .eq('project_id', currentProject.id)
-        .eq('mode', mode)
         .gte('mois', startDate)
         .lte('mois', endDate);
 
@@ -86,14 +91,14 @@ export const useFinancialReport = (year: number) => {
       const { data: prices } = await supabase
         .from('product_prices')
         .select('*')
-        .eq('mode', mode);
+        .eq('mode', dbMode);
 
       // Fetch expenses
       const { data: expenses } = await supabase
         .from('professional_expenses')
         .select('*')
         .eq('project_id', currentProject.id)
-        .eq('mode', mode)
+        .eq('mode', dbMode)
         .gte('mois', startDate)
         .lte('mois', endDate);
 
@@ -101,13 +106,13 @@ export const useFinancialReport = (year: number) => {
       const { data: recipes } = await supabase
         .from('recipes')
         .select('*, ingredients(*)')
-        .eq('mode', mode);
+        .eq('mode', dbMode);
 
       // Fetch packaging
       const { data: productPackaging } = await supabase
         .from('product_packaging')
         .select('*, packaging(*)')
-        .eq('mode', mode);
+        .eq('mode', dbMode);
 
       // Calculate monthly data
       const monthlyData: FinancialReportData[] = [];
@@ -179,53 +184,56 @@ export const useFinancialReport = (year: number) => {
   });
 };
 
-export const useProductReport = () => {
+export const useProductReport = (year: number, mode: ReportMode = 'budget') => {
   const { currentProject } = useProject();
-  const { mode } = useMode();
+  const dbMode = mapModeForProducts(mode);
 
   return useQuery({
-    queryKey: ['product-report', currentProject?.id, mode],
+    queryKey: ['product-report', currentProject?.id, mode, year],
     queryFn: async (): Promise<ProductReportData[]> => {
       if (!currentProject?.id) return [];
+
+      const startDate = `${year}-01-01`;
+      const endDate = `${year}-12-31`;
 
       // Fetch products with categories
       const { data: products } = await supabase
         .from('products')
         .select('*, categories(nom_categorie)')
         .eq('project_id', currentProject.id)
-        .eq('mode', mode);
+        .eq('mode', dbMode);
 
       // Fetch all prices
       const { data: prices } = await supabase
         .from('product_prices')
         .select('*')
-        .eq('mode', mode);
+        .eq('mode', dbMode);
 
       // Fetch recipes
       const { data: recipes } = await supabase
         .from('recipes')
         .select('*, ingredients(*)')
-        .eq('mode', mode);
+        .eq('mode', dbMode);
 
       // Fetch packaging
       const { data: productPackaging } = await supabase
         .from('product_packaging')
         .select('*, packaging(*)')
-        .eq('mode', mode);
+        .eq('mode', dbMode);
 
       // Fetch variable costs
       const { data: variableCosts } = await supabase
         .from('product_variable_costs')
         .select('*, variable_costs(*)')
-        .eq('mode', mode);
+        .eq('mode', dbMode);
 
-      // Fetch sales
-      const salesTable = mode === 'reel' ? 'sales_actuals' : 'sales_targets';
-      const { data: sales } = await supabase
-        .from(salesTable)
+      // Fetch sales based on mode - use annual_sales for better data
+      const { data: annualSales } = await supabase
+        .from('annual_sales')
         .select('*')
         .eq('project_id', currentProject.id)
-        .eq('mode', mode);
+        .eq('mode', mode)
+        .eq('year', year);
 
       const productData: ProductReportData[] = [];
       let totalMarge = 0;
@@ -253,10 +261,9 @@ export const useProductReport = () => {
           ? productPrices.reduce((sum, p) => sum + p.prix_ht, 0) / productPrices.length
           : product.prix_btc;
 
-        // Calculate sales volume
-        const quantityField = mode === 'reel' ? 'quantite_reelle' : 'quantite_objectif';
-        const productSales = sales?.filter(s => s.product_id === product.id) || [];
-        const volume_vendu = productSales.reduce((sum, s) => sum + (s[quantityField] || 0), 0);
+        // Calculate sales volume from annual_sales
+        const productSales = annualSales?.filter(s => s.product_id === product.id) || [];
+        const volume_vendu = productSales.reduce((sum, s) => sum + (s.quantite_annuelle || 0), 0);
 
         const marge_unitaire = prix_vente_moyen - cout_revient;
         const coefficient = cout_revient > 0 ? prix_vente_moyen / cout_revient : 0;
@@ -289,9 +296,9 @@ export const useProductReport = () => {
   });
 };
 
-export const useSalesReport = (year: number) => {
+export const useSalesReport = (year: number, mode: ReportMode = 'budget') => {
   const { currentProject } = useProject();
-  const { mode } = useMode();
+  const dbMode = mapModeForProducts(mode);
 
   return useQuery({
     queryKey: ['sales-report', currentProject?.id, mode, year],
@@ -301,12 +308,11 @@ export const useSalesReport = (year: number) => {
       const startDate = `${year}-01-01`;
       const endDate = `${year}-12-31`;
 
-      // Fetch targets
+      // Fetch targets (always from sales_targets for comparison)
       const { data: targets } = await supabase
         .from('sales_targets')
         .select('*')
         .eq('project_id', currentProject.id)
-        .eq('mode', mode)
         .gte('mois', startDate)
         .lte('mois', endDate);
 
@@ -315,7 +321,6 @@ export const useSalesReport = (year: number) => {
         .from('sales_actuals')
         .select('*')
         .eq('project_id', currentProject.id)
-        .eq('mode', mode)
         .gte('mois', startDate)
         .lte('mois', endDate);
 
@@ -323,7 +328,7 @@ export const useSalesReport = (year: number) => {
       const { data: prices } = await supabase
         .from('product_prices')
         .select('*')
-        .eq('mode', mode);
+        .eq('mode', dbMode);
 
       const salesData: SalesReportData[] = [];
       const canaux = ['BTC', 'BTB', 'Distributeur'];
@@ -377,9 +382,9 @@ export const useSalesReport = (year: number) => {
   });
 };
 
-export const useStockReport = () => {
+export const useStockReport = (mode: ReportMode = 'budget') => {
   const { currentProject } = useProject();
-  const { mode } = useMode();
+  const dbMode = mapModeForProducts(mode);
 
   return useQuery({
     queryKey: ['stock-report', currentProject?.id, mode],
@@ -390,7 +395,7 @@ export const useStockReport = () => {
         .from('stocks')
         .select('*, ingredients(*), packaging(*), products(*)')
         .eq('project_id', currentProject.id)
-        .eq('mode', mode);
+        .eq('mode', mode === 'budget' ? 'reel' : 'reel'); // Stocks are typically real
 
       // Fetch movements for rotation calculation
       const { data: movements } = await supabase

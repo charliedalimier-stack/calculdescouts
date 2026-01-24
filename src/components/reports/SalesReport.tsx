@@ -4,8 +4,9 @@ import { useSalesReport } from "@/hooks/useReports";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { DEFINITIONS } from "@/lib/pedagogicDefinitions";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MONTH_LABELS_FULL } from "@/lib/dateOptions";
-import { TrendingUp, TrendingDown, Target } from "lucide-react";
+import { TrendingUp, TrendingDown, Target, AlertCircle } from "lucide-react";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -20,6 +21,7 @@ import {
 
 interface SalesReportProps {
   year: number;
+  mode: 'budget' | 'reel';
 }
 
 const formatCurrency = (value: number) => {
@@ -43,11 +45,23 @@ const getEcartBadge = (ecart: number) => {
   return <Badge variant="destructive"><TrendingDown className="h-3 w-3 mr-1" />{formatPercent(ecart)}</Badge>;
 };
 
-export function SalesReport({ year }: SalesReportProps) {
-  const { data: salesData, isLoading } = useSalesReport(year);
+export function SalesReport({ year, mode }: SalesReportProps) {
+  const { data: salesData, isLoading } = useSalesReport(year, mode);
 
   if (isLoading) {
     return <div className="flex items-center justify-center p-8">Chargement...</div>;
+  }
+
+  if (!salesData || salesData.length === 0) {
+    return (
+      <Alert>
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          Aucune donnée de ventes disponible pour {year}.
+          Ajoutez des objectifs et des ventes réelles pour voir le rapport.
+        </AlertDescription>
+      </Alert>
+    );
   }
 
   // Aggregate by month for chart

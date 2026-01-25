@@ -10,30 +10,51 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileSpreadsheet } from "lucide-react";
+import { FileSpreadsheet, Loader2 } from "lucide-react";
+import { useFinancialPlan, FinancialPlanData } from "@/hooks/useFinancialPlan";
+import { EXPENSE_CATEGORIES } from "@/hooks/useExpenses";
 
 interface FinancialPlanRow {
+  key: string;
   label: string;
   isHeader?: boolean;
   isBold?: boolean;
+  isExpenseCategory?: boolean;
 }
 
-const financialPlanRows: FinancialPlanRow[] = [
-  { label: "CA total", isBold: true },
-  { label: "Achat marchandises total" },
-  { label: "Coefficient (CA / Achat marchandises)", isBold: true },
-  { label: "Bénéfice brut d'exploitation", isBold: true },
-  { label: "Charges professionnelles", isHeader: true },
-  { label: "Total charges professionnelles" },
-  { label: "Résultat indépendant", isBold: true },
-  { label: "Revenu brut" },
-  { label: "Cotisations sociales" },
-  { label: "Bénéfice net d'exploitation", isBold: true },
-  { label: "Impôts" },
-  { label: "Bénéfice de l'exercice", isBold: true },
-  { label: "Rémunération annuelle", isBold: true },
-  { label: "Rémunération mensuelle" },
-];
+const getFinancialPlanRows = (chargeCategories: string[]): FinancialPlanRow[] => {
+  const baseRows: FinancialPlanRow[] = [
+    { key: "ca_total", label: "CA total", isBold: true },
+    { key: "achats_marchandises", label: "Achat marchandises total" },
+    { key: "coefficient", label: "Coefficient (CA / Achat marchandises)", isBold: true },
+    { key: "benefice_brut", label: "Bénéfice brut d'exploitation", isBold: true },
+    { key: "charges_header", label: "Charges professionnelles", isHeader: true },
+  ];
+
+  // Add expense categories dynamically
+  chargeCategories.forEach(cat => {
+    const categoryLabel = EXPENSE_CATEGORIES.find(c => c.value === cat)?.label || cat;
+    baseRows.push({ 
+      key: `charge_${cat}`, 
+      label: `  ${categoryLabel}`,
+      isExpenseCategory: true 
+    });
+  });
+
+  baseRows.push(
+    { key: "total_charges", label: "Total charges professionnelles", isBold: true },
+    { key: "resultat_independant", label: "Résultat indépendant", isBold: true },
+    { key: "revenu_brut", label: "Revenu brut" },
+    { key: "cotisations_sociales", label: "Cotisations sociales" },
+    { key: "benefice_net", label: "Bénéfice net d'exploitation", isBold: true },
+    { key: "impots", label: "Impôts" },
+    { key: "benefice_exercice", label: "Bénéfice de l'exercice", isBold: true },
+    { key: "remuneration_annuelle", label: "Rémunération annuelle", isBold: true },
+    { key: "remuneration_mensuelle", label: "Rémunération mensuelle" },
+  );
+
+  return baseRows;
+};
 
 const formatValue = (value: number | null): string => {
   if (value === null) return "–";
@@ -50,31 +71,76 @@ const formatCoefficient = (value: number | null): string => {
   return value.toFixed(2);
 };
 
+const getRowValue = (
+  key: string,
+  data: FinancialPlanData
+): number | null => {
+  switch (key) {
+    case "ca_total":
+      return data.ca_total;
+    case "achats_marchandises":
+      return data.achats_marchandises;
+    case "coefficient":
+      return data.coefficient;
+    case "benefice_brut":
+      return data.benefice_brut;
+    case "total_charges":
+      return data.charges_professionnelles.total;
+    case "resultat_independant":
+      return data.resultat_independant;
+    // Placeholder values for future implementation
+    case "revenu_brut":
+      return data.resultat_independant; // Simplified: same as resultat
+    case "cotisations_sociales":
+      return 0; // TODO: implement when settings available
+    case "benefice_net":
+      return data.resultat_independant; // Simplified for now
+    case "impots":
+      return 0; // TODO: implement when settings available
+    case "benefice_exercice":
+      return data.resultat_independant;
+    case "remuneration_annuelle":
+      return data.resultat_independant;
+    case "remuneration_mensuelle":
+      return data.resultat_independant / 12;
+    default:
+      // Check if it's an expense category
+      if (key.startsWith("charge_")) {
+        const cat = key.replace("charge_", "");
+        return data.charges_professionnelles.by_category[cat] || 0;
+      }
+      return null;
+  }
+};
+
 const PlanFinancier = () => {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [dataMode, setDataMode] = useState<DataMode>("budget");
 
-  // Placeholder data - all zeros for now
-  const getData = (rowLabel: string, _yearOffset: number, _mode: "budget" | "reel"): number | null => {
-    // Return 0 for all values as placeholder
-    if (rowLabel === "Charges professionnelles") return null; // Header row
-    return 0;
-  };
-
-  const getDifference = (rowLabel: string, yearOffset: number): number | null => {
-    if (rowLabel === "Charges professionnelles") return null;
-    const budget = getData(rowLabel, yearOffset, "budget");
-    const reel = getData(rowLabel, yearOffset, "reel");
-    if (budget === null || reel === null) return null;
-    return reel - budget;
-  };
-
-  const isCoefficient = (label: string) => label.includes("Coefficient");
+  const { data: planData, isLoading } = useFinancialPlan(selectedYear);
 
   const handlePeriodChange = (params: { month?: number; year: number; mode: DataMode }) => {
     setSelectedYear(params.year);
     setDataMode(params.mode);
+  };
+
+  // Collect all unique expense categories from both years
+  const allCategories = new Set<string>();
+  if (planData) {
+    Object.keys(planData.yearN.budget.charges_professionnelles.by_category).forEach(c => allCategories.add(c));
+    Object.keys(planData.yearN.reel.charges_professionnelles.by_category).forEach(c => allCategories.add(c));
+    Object.keys(planData.yearN1.budget.charges_professionnelles.by_category).forEach(c => allCategories.add(c));
+    Object.keys(planData.yearN1.reel.charges_professionnelles.by_category).forEach(c => allCategories.add(c));
+  }
+
+  const financialPlanRows = getFinancialPlanRows(Array.from(allCategories));
+
+  const isCoefficient = (key: string) => key === "coefficient";
+
+  const getDifference = (budget: number | null, reel: number | null): number | null => {
+    if (budget === null || reel === null) return null;
+    return reel - budget;
   };
 
   return (
@@ -89,105 +155,115 @@ const PlanFinancier = () => {
           />
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileSpreadsheet className="h-5 w-5" />
-              Plan financier prévisionnel
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="min-w-[200px]">Libellé</TableHead>
-                    <TableHead className="text-right bg-muted/30" colSpan={3}>
-                      Année {selectedYear} (N)
-                    </TableHead>
-                    <TableHead className="text-right bg-muted/50" colSpan={3}>
-                      Année {selectedYear + 1} (N+1)
-                    </TableHead>
-                  </TableRow>
-                  <TableRow>
-                    <TableHead></TableHead>
-                    <TableHead className="text-right text-xs bg-muted/30">Budget</TableHead>
-                    <TableHead className="text-right text-xs bg-muted/30">Réel</TableHead>
-                    <TableHead className="text-right text-xs bg-muted/30">Écart</TableHead>
-                    <TableHead className="text-right text-xs bg-muted/50">Budget</TableHead>
-                    <TableHead className="text-right text-xs bg-muted/50">Réel</TableHead>
-                    <TableHead className="text-right text-xs bg-muted/50">Écart</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {financialPlanRows.map((row, index) => {
-                    const yearNBudget = getData(row.label, 0, "budget");
-                    const yearNReel = getData(row.label, 0, "reel");
-                    const yearNDiff = getDifference(row.label, 0);
-                    const yearN1Budget = getData(row.label, 1, "budget");
-                    const yearN1Reel = getData(row.label, 1, "reel");
-                    const yearN1Diff = getDifference(row.label, 1);
+        {isLoading ? (
+          <Card>
+            <CardContent className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileSpreadsheet className="h-5 w-5" />
+                Plan financier prévisionnel
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[200px]">Libellé</TableHead>
+                      <TableHead className="text-right bg-muted/30" colSpan={3}>
+                        Année {selectedYear} (N)
+                      </TableHead>
+                      <TableHead className="text-right bg-muted/50" colSpan={3}>
+                        Année {selectedYear + 1} (N+1)
+                      </TableHead>
+                    </TableRow>
+                    <TableRow>
+                      <TableHead></TableHead>
+                      <TableHead className="text-right text-xs bg-muted/30">Budget</TableHead>
+                      <TableHead className="text-right text-xs bg-muted/30">Réel</TableHead>
+                      <TableHead className="text-right text-xs bg-muted/30">Écart</TableHead>
+                      <TableHead className="text-right text-xs bg-muted/50">Budget</TableHead>
+                      <TableHead className="text-right text-xs bg-muted/50">Réel</TableHead>
+                      <TableHead className="text-right text-xs bg-muted/50">Écart</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {financialPlanRows.map((row, index) => {
+                      if (row.isHeader) {
+                        return (
+                          <TableRow key={index} className="bg-muted/20">
+                            <TableCell colSpan={7} className="font-semibold text-muted-foreground uppercase text-sm">
+                              {row.label}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      }
 
-                    const formatFn = isCoefficient(row.label) ? formatCoefficient : formatValue;
+                      const yearNBudget = planData ? getRowValue(row.key, planData.yearN.budget) : 0;
+                      const yearNReel = planData ? getRowValue(row.key, planData.yearN.reel) : 0;
+                      const yearNDiff = getDifference(yearNBudget, yearNReel);
+                      
+                      const yearN1Budget = planData ? getRowValue(row.key, planData.yearN1.budget) : 0;
+                      const yearN1Reel = planData ? getRowValue(row.key, planData.yearN1.reel) : 0;
+                      const yearN1Diff = getDifference(yearN1Budget, yearN1Reel);
 
-                    if (row.isHeader) {
+                      const formatFn = isCoefficient(row.key) ? formatCoefficient : formatValue;
+
+                      // For differences, positive is good for revenue items, bad for cost items
+                      const isRevenueItem = ["ca_total", "benefice_brut", "resultat_independant", "benefice_net", "benefice_exercice", "remuneration_annuelle", "remuneration_mensuelle", "revenu_brut"].includes(row.key);
+                      
+                      const getDiffColor = (diff: number | null) => {
+                        if (diff === null || diff === 0) return "";
+                        if (isRevenueItem) {
+                          return diff > 0 ? "text-green-600" : "text-red-600";
+                        } else {
+                          // For costs, higher real = worse
+                          return diff < 0 ? "text-green-600" : "text-red-600";
+                        }
+                      };
+
                       return (
-                        <TableRow key={index} className="bg-muted/20">
-                          <TableCell colSpan={7} className="font-semibold text-muted-foreground uppercase text-sm">
+                        <TableRow key={index} className={row.isExpenseCategory ? "text-muted-foreground" : ""}>
+                          <TableCell className={row.isBold ? "font-semibold" : ""}>
                             {row.label}
+                          </TableCell>
+                          <TableCell className="text-right bg-muted/10">
+                            {formatFn(yearNBudget)}
+                          </TableCell>
+                          <TableCell className="text-right bg-muted/10">
+                            {formatFn(yearNReel)}
+                          </TableCell>
+                          <TableCell className={`text-right bg-muted/10 ${getDiffColor(yearNDiff)}`}>
+                            {yearNDiff !== null ? formatFn(yearNDiff) : "–"}
+                          </TableCell>
+                          <TableCell className="text-right bg-muted/20">
+                            {formatFn(yearN1Budget)}
+                          </TableCell>
+                          <TableCell className="text-right bg-muted/20">
+                            {formatFn(yearN1Reel)}
+                          </TableCell>
+                          <TableCell className={`text-right bg-muted/20 ${getDiffColor(yearN1Diff)}`}>
+                            {yearN1Diff !== null ? formatFn(yearN1Diff) : "–"}
                           </TableCell>
                         </TableRow>
                       );
-                    }
-
-                    return (
-                      <TableRow key={index}>
-                        <TableCell className={row.isBold ? "font-semibold" : ""}>
-                          {row.label}
-                        </TableCell>
-                        <TableCell className="text-right bg-muted/10">
-                          {formatFn(yearNBudget)}
-                        </TableCell>
-                        <TableCell className="text-right bg-muted/10">
-                          {formatFn(yearNReel)}
-                        </TableCell>
-                        <TableCell className={`text-right bg-muted/10 ${
-                          yearNDiff !== null && yearNDiff > 0 
-                            ? "text-green-600" 
-                            : yearNDiff !== null && yearNDiff < 0 
-                              ? "text-red-600" 
-                              : ""
-                        }`}>
-                          {yearNDiff !== null ? formatFn(yearNDiff) : "–"}
-                        </TableCell>
-                        <TableCell className="text-right bg-muted/20">
-                          {formatFn(yearN1Budget)}
-                        </TableCell>
-                        <TableCell className="text-right bg-muted/20">
-                          {formatFn(yearN1Reel)}
-                        </TableCell>
-                        <TableCell className={`text-right bg-muted/20 ${
-                          yearN1Diff !== null && yearN1Diff > 0 
-                            ? "text-green-600" 
-                            : yearN1Diff !== null && yearN1Diff < 0 
-                              ? "text-red-600" 
-                              : ""
-                        }`}>
-                          {yearN1Diff !== null ? formatFn(yearN1Diff) : "–"}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="border-dashed">
           <CardContent className="py-4">
             <p className="text-sm text-muted-foreground text-center">
-              💡 Les données seront calculées automatiquement à partir des ventes, achats et charges professionnelles enregistrés.
+              💡 Les données sont calculées automatiquement à partir des ventes, achats et charges professionnelles enregistrés.
             </p>
           </CardContent>
         </Card>

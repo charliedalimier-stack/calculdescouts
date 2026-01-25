@@ -24,7 +24,7 @@ import StressTest from "./pages/StressTest";
 import Matrix from "./pages/Matrix";
 import Stocks from "./pages/Stocks";
 import TVA from "./pages/TVA";
-// import Global from "./pages/Global"; // Reserved for future "Plan financier"
+import PlanFinancier from "./pages/PlanFinancier";
 import Expenses from "./pages/Expenses";
 import Settings from "./pages/Settings";
 import BudgetVsReel from "./pages/BudgetVsReel";
@@ -45,7 +45,7 @@ const App = () => (
               <Routes>
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-                {/* Route /global reserved for future "Plan financier" */}
+                <Route path="/plan-financier" element={<ProtectedRoute><PlanFinancier /></ProtectedRoute>} />
                 <Route path="/budget-vs-reel" element={<ProtectedRoute><BudgetVsReel /></ProtectedRoute>} />
                 <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
                 <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />

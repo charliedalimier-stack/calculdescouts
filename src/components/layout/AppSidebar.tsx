@@ -42,7 +42,6 @@ import {
 
 const mainNavItems = [
   { title: "Tableau de bord", icon: LayoutDashboard, path: "/" },
-  { title: "Synthèse Globale", icon: Globe, path: "/global" },
   { title: "Budget vs Réel", icon: Scale, path: "/budget-vs-reel" },
   { title: "Rapports", icon: FileText, path: "/reports" },
   { title: "Projets", icon: FolderOpen, path: "/projects" },

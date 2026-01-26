@@ -11,8 +11,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { FileSpreadsheet, Loader2 } from "lucide-react";
-import { useFinancialPlan, FinancialPlanData } from "@/hooks/useFinancialPlan";
+import { useFinancialPlan, FinancialPlanData, FiscalParams } from "@/hooks/useFinancialPlan";
 import { useProjectSettings } from "@/hooks/useProjectSettings";
+import { useTaxBrackets } from "@/hooks/useTaxBrackets";
 import { EXPENSE_CATEGORIES } from "@/hooks/useExpenses";
 
 interface FinancialPlanRow {
@@ -47,8 +48,13 @@ const getFinancialPlanRows = (chargeCategories: string[]): FinancialPlanRow[] =>
     { key: "resultat_independant", label: "Résultat indépendant", isBold: true },
     { key: "revenu_brut", label: "Revenu brut" },
     { key: "cotisations_sociales", label: "Cotisations sociales" },
-    { key: "benefice_net", label: "Bénéfice net d'exploitation", isBold: true },
-    { key: "impots", label: "Impôts" },
+    { key: "benefice_net", label: "Bénéfice net avant impôts", isBold: true },
+    { key: "impots_header", label: "Calcul de l'impôt", isHeader: true },
+    { key: "quotite_exemptee", label: "  Quotité exemptée" },
+    { key: "base_imposable", label: "  Base imposable" },
+    { key: "impot_base", label: "  Impôt de base (par tranches)" },
+    { key: "impot_communal", label: "  Additionnel communal" },
+    { key: "impot_total", label: "Impôt total", isBold: true },
     { key: "benefice_exercice", label: "Bénéfice de l'exercice", isBold: true },
     { key: "remuneration_annuelle", label: "Rémunération annuelle", isBold: true },
     { key: "remuneration_mensuelle", label: "Rémunération mensuelle" },
@@ -95,14 +101,22 @@ const getRowValue = (
       return data.cotisations_sociales;
     case "benefice_net":
       return data.benefice_net_avant_impots;
-    case "impots":
-      return 0; // TODO: implement when settings available
+    case "quotite_exemptee":
+      return data.quotite_exemptee;
+    case "base_imposable":
+      return data.base_imposable;
+    case "impot_base":
+      return data.impot_base;
+    case "impot_communal":
+      return data.impot_communal;
+    case "impot_total":
+      return data.impot_total;
     case "benefice_exercice":
-      return data.benefice_net_avant_impots; // For now same as benefice_net
+      return data.benefice_exercice;
     case "remuneration_annuelle":
-      return data.benefice_net_avant_impots;
+      return data.remuneration_annuelle;
     case "remuneration_mensuelle":
-      return data.benefice_net_avant_impots / 12;
+      return data.remuneration_mensuelle;
     default:
       // Check if it's an expense category
       if (key.startsWith("charge_")) {
@@ -119,9 +133,24 @@ const PlanFinancier = () => {
   const [dataMode, setDataMode] = useState<DataMode>("budget");
   
   const { settings } = useProjectSettings();
-  const tauxCotisations = settings?.taux_cotisations_sociales ?? 20.5;
+  const { brackets } = useTaxBrackets();
+  
+  // Build fiscal params from settings
+  const fiscalParams: FiscalParams = {
+    tauxCotisationsSociales: settings?.taux_cotisations_sociales ?? 20.5,
+    tauxCommunal: settings?.taux_communal ?? 7.0,
+    nombreEnfantsCharge: settings?.nombre_enfants_charge ?? 0,
+    quotiteExempteeBase: settings?.quotite_exemptee_base ?? 10570,
+    majorationParEnfant: settings?.majoration_par_enfant ?? 1850,
+    taxBrackets: brackets.map(b => ({
+      tranche_min: b.tranche_min,
+      tranche_max: b.tranche_max,
+      taux: b.taux,
+      ordre: b.ordre,
+    })),
+  };
 
-  const { data: planData, isLoading } = useFinancialPlan(selectedYear, tauxCotisations);
+  const { data: planData, isLoading } = useFinancialPlan(selectedYear, fiscalParams);
 
   const handlePeriodChange = (params: { month?: number; year: number; mode: DataMode }) => {
     setSelectedYear(params.year);

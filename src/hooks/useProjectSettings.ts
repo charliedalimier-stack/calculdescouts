@@ -27,6 +27,12 @@ export interface ProjectSettings {
   tva_reduit_2: number;
   // Social contributions
   taux_cotisations_sociales: number;
+  // Fiscal parameters
+  annee_fiscale_reference: number;
+  taux_communal: number;
+  nombre_enfants_charge: number;
+  quotite_exemptee_base: number;
+  majoration_par_enfant: number;
   created_at: string;
   updated_at: string;
 }
@@ -58,6 +64,12 @@ const defaultSettings: Omit<ProjectSettings, 'id' | 'project_id' | 'created_at' 
   tva_reduit_2: 6,
   // Social contributions
   taux_cotisations_sociales: 20.5,
+  // Fiscal parameters
+  annee_fiscale_reference: 2026,
+  taux_communal: 7.0,
+  nombre_enfants_charge: 0,
+  quotite_exemptee_base: 10570,
+  majoration_par_enfant: 1850,
 };
 
 export function useProjectSettings() {

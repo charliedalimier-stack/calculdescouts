@@ -721,20 +721,25 @@ export type Database = {
       }
       project_settings: {
         Row: {
+          annee_fiscale_reference: number
           coefficient_cible: number
           coefficient_min: number
           created_at: string
           delai_paiement_client: number
           delai_paiement_fournisseur: number
           id: string
+          majoration_par_enfant: number
           marge_btb: number
           marge_cible: number
           marge_distributeur: number
           marge_min: number
+          nombre_enfants_charge: number
           pays: string
           project_id: string
+          quotite_exemptee_base: number
           regime_tva: string
           seuil_stock_alerte: number
+          taux_communal: number
           taux_cotisations_sociales: number
           tva_achat: number
           tva_reduit_1: number
@@ -744,20 +749,25 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          annee_fiscale_reference?: number
           coefficient_cible?: number
           coefficient_min?: number
           created_at?: string
           delai_paiement_client?: number
           delai_paiement_fournisseur?: number
           id?: string
+          majoration_par_enfant?: number
           marge_btb?: number
           marge_cible?: number
           marge_distributeur?: number
           marge_min?: number
+          nombre_enfants_charge?: number
           pays?: string
           project_id: string
+          quotite_exemptee_base?: number
           regime_tva?: string
           seuil_stock_alerte?: number
+          taux_communal?: number
           taux_cotisations_sociales?: number
           tva_achat?: number
           tva_reduit_1?: number
@@ -767,20 +777,25 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          annee_fiscale_reference?: number
           coefficient_cible?: number
           coefficient_min?: number
           created_at?: string
           delai_paiement_client?: number
           delai_paiement_fournisseur?: number
           id?: string
+          majoration_par_enfant?: number
           marge_btb?: number
           marge_cible?: number
           marge_distributeur?: number
           marge_min?: number
+          nombre_enfants_charge?: number
           pays?: string
           project_id?: string
+          quotite_exemptee_base?: number
           regime_tva?: string
           seuil_stock_alerte?: number
+          taux_communal?: number
           taux_cotisations_sociales?: number
           tva_achat?: number
           tva_reduit_1?: number
@@ -1226,6 +1241,47 @@ export type Database = {
           },
           {
             foreignKeyName: "stocks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tax_brackets: {
+        Row: {
+          created_at: string
+          id: string
+          ordre: number
+          project_id: string
+          taux: number
+          tranche_max: number | null
+          tranche_min: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ordre?: number
+          project_id: string
+          taux?: number
+          tranche_max?: number | null
+          tranche_min?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ordre?: number
+          project_id?: string
+          taux?: number
+          tranche_max?: number | null
+          tranche_min?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tax_brackets_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"

@@ -2,6 +2,22 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '@/contexts/ProjectContext';
 
+export interface TaxBracket {
+  tranche_min: number;
+  tranche_max: number | null;
+  taux: number;
+  ordre: number;
+}
+
+export interface FiscalParams {
+  tauxCotisationsSociales: number;
+  tauxCommunal: number;
+  nombreEnfantsCharge: number;
+  quotiteExempteeBase: number;
+  majorationParEnfant: number;
+  taxBrackets: TaxBracket[];
+}
+
 export interface FinancialPlanData {
   ca_total: number;
   achats_marchandises: number;
@@ -15,12 +31,50 @@ export interface FinancialPlanData {
   revenu_brut: number;
   cotisations_sociales: number;
   benefice_net_avant_impots: number;
+  // Tax calculation fields
+  quotite_exemptee: number;
+  base_imposable: number;
+  impot_base: number;
+  impot_communal: number;
+  impot_total: number;
+  benefice_exercice: number;
+  remuneration_annuelle: number;
+  remuneration_mensuelle: number;
 }
 
 export interface FinancialPlanYear {
   budget: FinancialPlanData;
   reel: FinancialPlanData;
 }
+
+// Helper function to calculate tax by brackets
+const calculateTaxByBrackets = (baseImposable: number, brackets: TaxBracket[]): number => {
+  if (baseImposable <= 0 || brackets.length === 0) return 0;
+  
+  let impot = 0;
+  let remainingIncome = baseImposable;
+  
+  // Sort brackets by ordre
+  const sortedBrackets = [...brackets].sort((a, b) => a.ordre - b.ordre);
+  
+  for (const bracket of sortedBrackets) {
+    if (remainingIncome <= 0) break;
+    
+    const bracketMin = Number(bracket.tranche_min);
+    const bracketMax = bracket.tranche_max !== null ? Number(bracket.tranche_max) : Infinity;
+    const taux = Number(bracket.taux) / 100;
+    
+    const bracketWidth = bracketMax - bracketMin;
+    const taxableInBracket = Math.min(remainingIncome, bracketWidth);
+    
+    if (taxableInBracket > 0) {
+      impot += taxableInBracket * taux;
+      remainingIncome -= taxableInBracket;
+    }
+  }
+  
+  return impot;
+};
 
 const getEmptyData = (): FinancialPlanData => ({
   ca_total: 0,
@@ -35,29 +89,44 @@ const getEmptyData = (): FinancialPlanData => ({
   revenu_brut: 0,
   cotisations_sociales: 0,
   benefice_net_avant_impots: 0,
+  quotite_exemptee: 0,
+  base_imposable: 0,
+  impot_base: 0,
+  impot_communal: 0,
+  impot_total: 0,
+  benefice_exercice: 0,
+  remuneration_annuelle: 0,
+  remuneration_mensuelle: 0,
 });
 
-export function useFinancialPlan(baseYear: number, tauxCotisationsSociales: number = 20.5) {
+export function useFinancialPlan(baseYear: number, fiscalParams: FiscalParams) {
   const { currentProject } = useProject();
+  
+  const { 
+    tauxCotisationsSociales = 20.5, 
+    tauxCommunal = 7.0,
+    nombreEnfantsCharge = 0,
+    quotiteExempteeBase = 10570,
+    majorationParEnfant = 1850,
+    taxBrackets = [],
+  } = fiscalParams;
 
   return useQuery({
-    queryKey: ['financial-plan', currentProject?.id, baseYear, tauxCotisationsSociales],
+    queryKey: ['financial-plan', currentProject?.id, baseYear, JSON.stringify(fiscalParams)],
     queryFn: async () => {
       if (!currentProject?.id) {
         return {
           yearN: { budget: getEmptyData(), reel: getEmptyData() },
           yearN1: { budget: getEmptyData(), reel: getEmptyData() },
-          tauxCotisationsSociales,
         };
       }
 
       const years = [baseYear, baseYear + 1];
       const modes = ['budget', 'reel'] as const;
       
-      const result: { yearN: FinancialPlanYear; yearN1: FinancialPlanYear; tauxCotisationsSociales: number } = {
+      const result: { yearN: FinancialPlanYear; yearN1: FinancialPlanYear } = {
         yearN: { budget: getEmptyData(), reel: getEmptyData() },
         yearN1: { budget: getEmptyData(), reel: getEmptyData() },
-        tauxCotisationsSociales,
       };
 
       // Fetch products for cost calculation
@@ -201,10 +270,33 @@ export function useFinancialPlan(baseYear: number, tauxCotisationsSociales: numb
           const revenuBrut = resultatIndependant;
           
           // Cotisations sociales = Revenu brut × taux
-          const cotisationsSociales = revenuBrut * (tauxCotisationsSociales / 100);
+          const cotisationsSociales = revenuBrut > 0 ? revenuBrut * (tauxCotisationsSociales / 100) : 0;
           
           // Bénéfice net avant impôts = Revenu brut - Cotisations sociales
           const beneficeNetAvantImpots = revenuBrut - cotisationsSociales;
+          
+          // TAX CALCULATION
+          // Quotité exemptée = Base + (majoration × nombre enfants)
+          const quotiteExemptee = quotiteExempteeBase + (majorationParEnfant * nombreEnfantsCharge);
+          
+          // Base imposable = Bénéfice net avant impôts - Quotité exemptée
+          const baseImposable = Math.max(0, beneficeNetAvantImpots - quotiteExemptee);
+          
+          // Impôt de base par tranches
+          const impotBase = calculateTaxByBrackets(baseImposable, taxBrackets);
+          
+          // Impôt communal = Impôt base × taux communal
+          const impotCommunal = impotBase * (tauxCommunal / 100);
+          
+          // Impôt total
+          const impotTotal = impotBase + impotCommunal;
+          
+          // Bénéfice de l'exercice = Bénéfice net avant impôts - Impôt total
+          const beneficeExercice = beneficeNetAvantImpots - impotTotal;
+          
+          // Rémunérations
+          const remunerationAnnuelle = beneficeExercice;
+          const remunerationMensuelle = beneficeExercice / 12;
 
           const data: FinancialPlanData = {
             ca_total: caTotal,
@@ -219,7 +311,22 @@ export function useFinancialPlan(baseYear: number, tauxCotisationsSociales: numb
             revenu_brut: revenuBrut,
             cotisations_sociales: cotisationsSociales,
             benefice_net_avant_impots: beneficeNetAvantImpots,
+            quotite_exemptee: quotiteExemptee,
+            base_imposable: baseImposable,
+            impot_base: impotBase,
+            impot_communal: impotCommunal,
+            impot_total: impotTotal,
+            benefice_exercice: beneficeExercice,
+            remuneration_annuelle: remunerationAnnuelle,
+            remuneration_mensuelle: remunerationMensuelle,
           };
+
+          // Assign to correct year and mode
+          if (year === baseYear) {
+            result.yearN[mode] = data;
+          } else {
+            result.yearN1[mode] = data;
+          }
 
           // Assign to correct year and mode
           if (year === baseYear) {

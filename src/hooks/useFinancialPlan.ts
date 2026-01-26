@@ -12,6 +12,9 @@ export interface FinancialPlanData {
     by_category: { [key: string]: number };
   };
   resultat_independant: number;
+  revenu_brut: number;
+  cotisations_sociales: number;
+  benefice_net_avant_impots: number;
 }
 
 export interface FinancialPlanYear {
@@ -29,27 +32,32 @@ const getEmptyData = (): FinancialPlanData => ({
     by_category: {},
   },
   resultat_independant: 0,
+  revenu_brut: 0,
+  cotisations_sociales: 0,
+  benefice_net_avant_impots: 0,
 });
 
-export function useFinancialPlan(baseYear: number) {
+export function useFinancialPlan(baseYear: number, tauxCotisationsSociales: number = 20.5) {
   const { currentProject } = useProject();
 
   return useQuery({
-    queryKey: ['financial-plan', currentProject?.id, baseYear],
+    queryKey: ['financial-plan', currentProject?.id, baseYear, tauxCotisationsSociales],
     queryFn: async () => {
       if (!currentProject?.id) {
         return {
           yearN: { budget: getEmptyData(), reel: getEmptyData() },
           yearN1: { budget: getEmptyData(), reel: getEmptyData() },
+          tauxCotisationsSociales,
         };
       }
 
       const years = [baseYear, baseYear + 1];
       const modes = ['budget', 'reel'] as const;
       
-      const result: { yearN: FinancialPlanYear; yearN1: FinancialPlanYear } = {
+      const result: { yearN: FinancialPlanYear; yearN1: FinancialPlanYear; tauxCotisationsSociales: number } = {
         yearN: { budget: getEmptyData(), reel: getEmptyData() },
         yearN1: { budget: getEmptyData(), reel: getEmptyData() },
+        tauxCotisationsSociales,
       };
 
       // Fetch products for cost calculation
@@ -188,6 +196,15 @@ export function useFinancialPlan(baseYear: number) {
           const coefficient = achatsMarchandises > 0 ? caTotal / achatsMarchandises : 0;
           const beneficeBrut = caTotal - achatsMarchandises;
           const resultatIndependant = beneficeBrut - totalCharges;
+          
+          // Revenu brut = Résultat indépendant (base pour les cotisations)
+          const revenuBrut = resultatIndependant;
+          
+          // Cotisations sociales = Revenu brut × taux
+          const cotisationsSociales = revenuBrut * (tauxCotisationsSociales / 100);
+          
+          // Bénéfice net avant impôts = Revenu brut - Cotisations sociales
+          const beneficeNetAvantImpots = revenuBrut - cotisationsSociales;
 
           const data: FinancialPlanData = {
             ca_total: caTotal,
@@ -199,6 +216,9 @@ export function useFinancialPlan(baseYear: number) {
               by_category: chargesByCategory,
             },
             resultat_independant: resultatIndependant,
+            revenu_brut: revenuBrut,
+            cotisations_sociales: cotisationsSociales,
+            benefice_net_avant_impots: beneficeNetAvantImpots,
           };
 
           // Assign to correct year and mode

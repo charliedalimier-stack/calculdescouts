@@ -25,6 +25,8 @@ export interface ProjectSettings {
   tva_standard: number;
   tva_reduit_1: number;
   tva_reduit_2: number;
+  // Social contributions
+  taux_cotisations_sociales: number;
   created_at: string;
   updated_at: string;
 }
@@ -54,6 +56,8 @@ const defaultSettings: Omit<ProjectSettings, 'id' | 'project_id' | 'created_at' 
   tva_standard: 21,
   tva_reduit_1: 12,
   tva_reduit_2: 6,
+  // Social contributions
+  taux_cotisations_sociales: 20.5,
 };
 
 export function useProjectSettings() {

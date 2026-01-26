@@ -735,6 +735,7 @@ export type Database = {
           project_id: string
           regime_tva: string
           seuil_stock_alerte: number
+          taux_cotisations_sociales: number
           tva_achat: number
           tva_reduit_1: number
           tva_reduit_2: number
@@ -757,6 +758,7 @@ export type Database = {
           project_id: string
           regime_tva?: string
           seuil_stock_alerte?: number
+          taux_cotisations_sociales?: number
           tva_achat?: number
           tva_reduit_1?: number
           tva_reduit_2?: number
@@ -779,6 +781,7 @@ export type Database = {
           project_id?: string
           regime_tva?: string
           seuil_stock_alerte?: number
+          taux_cotisations_sociales?: number
           tva_achat?: number
           tva_reduit_1?: number
           tva_reduit_2?: number

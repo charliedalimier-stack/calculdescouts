@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { FileSpreadsheet, Loader2 } from "lucide-react";
 import { useFinancialPlan, FinancialPlanData } from "@/hooks/useFinancialPlan";
+import { useProjectSettings } from "@/hooks/useProjectSettings";
 import { EXPENSE_CATEGORIES } from "@/hooks/useExpenses";
 
 interface FinancialPlanRow {
@@ -88,21 +89,20 @@ const getRowValue = (
       return data.charges_professionnelles.total;
     case "resultat_independant":
       return data.resultat_independant;
-    // Placeholder values for future implementation
     case "revenu_brut":
-      return data.resultat_independant; // Simplified: same as resultat
+      return data.revenu_brut;
     case "cotisations_sociales":
-      return 0; // TODO: implement when settings available
+      return data.cotisations_sociales;
     case "benefice_net":
-      return data.resultat_independant; // Simplified for now
+      return data.benefice_net_avant_impots;
     case "impots":
       return 0; // TODO: implement when settings available
     case "benefice_exercice":
-      return data.resultat_independant;
+      return data.benefice_net_avant_impots; // For now same as benefice_net
     case "remuneration_annuelle":
-      return data.resultat_independant;
+      return data.benefice_net_avant_impots;
     case "remuneration_mensuelle":
-      return data.resultat_independant / 12;
+      return data.benefice_net_avant_impots / 12;
     default:
       // Check if it's an expense category
       if (key.startsWith("charge_")) {
@@ -117,8 +117,11 @@ const PlanFinancier = () => {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [dataMode, setDataMode] = useState<DataMode>("budget");
+  
+  const { settings } = useProjectSettings();
+  const tauxCotisations = settings?.taux_cotisations_sociales ?? 20.5;
 
-  const { data: planData, isLoading } = useFinancialPlan(selectedYear);
+  const { data: planData, isLoading } = useFinancialPlan(selectedYear, tauxCotisations);
 
   const handlePeriodChange = (params: { month?: number; year: number; mode: DataMode }) => {
     setSelectedYear(params.year);

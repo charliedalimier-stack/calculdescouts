@@ -26,6 +26,7 @@ const SettingsPage = () => {
     seuil_stock_alerte: 10,
     delai_paiement_client: 30,
     delai_paiement_fournisseur: 30,
+    taux_cotisations_sociales: 20.5,
   });
 
   useEffect(() => {
@@ -42,6 +43,7 @@ const SettingsPage = () => {
         seuil_stock_alerte: settings.seuil_stock_alerte,
         delai_paiement_client: settings.delai_paiement_client,
         delai_paiement_fournisseur: settings.delai_paiement_fournisseur,
+        taux_cotisations_sociales: settings.taux_cotisations_sociales,
       });
     }
   }, [settings]);
@@ -235,6 +237,20 @@ const SettingsPage = () => {
               />
               <p className="text-xs text-muted-foreground">
                 Taux normal par défaut pour les achats
+              </p>
+            </div>
+            <Separator />
+            <div className="space-y-2">
+              <Label htmlFor="taux_cotisations_sociales">Taux cotisations sociales (%)</Label>
+              <Input
+                id="taux_cotisations_sociales"
+                type="number"
+                step="0.1"
+                value={formData.taux_cotisations_sociales}
+                onChange={(e) => handleChange('taux_cotisations_sociales', e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Taux appliqué sur le revenu brut (défaut : 20,5%)
               </p>
             </div>
           </CardContent>

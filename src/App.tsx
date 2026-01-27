@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProjectProvider } from "@/contexts/ProjectContext";
 import { ModeProvider } from "@/contexts/ModeContext";
@@ -27,7 +27,7 @@ import TVA from "./pages/TVA";
 import PlanFinancier from "./pages/PlanFinancier";
 import Expenses from "./pages/Expenses";
 import Settings from "./pages/Settings";
-import BudgetVsReel from "./pages/BudgetVsReel";
+
 import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
 
@@ -46,7 +46,7 @@ const App = () => (
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 <Route path="/plan-financier" element={<ProtectedRoute><PlanFinancier /></ProtectedRoute>} />
-                <Route path="/budget-vs-reel" element={<ProtectedRoute><BudgetVsReel /></ProtectedRoute>} />
+                <Route path="/budget-vs-reel" element={<Navigate to="/plan-financier" replace />} />
                 <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
                 <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
                 <Route path="/ingredients" element={<ProtectedRoute><Ingredients /></ProtectedRoute>} />

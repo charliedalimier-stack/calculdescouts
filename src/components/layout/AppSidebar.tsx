@@ -22,7 +22,7 @@ import {
   Briefcase,
   LogOut,
   User,
-  Scale,
+  
   FileSpreadsheet,
 } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
@@ -44,7 +44,6 @@ import {
 const mainNavItems = [
   { title: "Tableau de bord", icon: LayoutDashboard, path: "/" },
   { title: "Plan financier", icon: FileSpreadsheet, path: "/plan-financier" },
-  { title: "Budget vs Réel", icon: Scale, path: "/budget-vs-reel" },
   { title: "Rapports", icon: FileText, path: "/reports" },
   { title: "Projets", icon: FolderOpen, path: "/projects" },
 ];

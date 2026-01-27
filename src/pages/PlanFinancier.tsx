@@ -46,8 +46,7 @@ const getFinancialPlanRows = (chargeCategories: string[]): FinancialPlanRow[] =>
 
   baseRows.push(
     { key: "total_charges", label: "Total charges professionnelles", isBold: true },
-    { key: "resultat_independant", label: "Résultat indépendant", isBold: true },
-    { key: "revenu_brut", label: "Revenu brut" },
+    { key: "revenu_brut", label: "Revenu brut", isBold: true },
     { key: "cotisations_sociales", label: "Cotisations sociales" },
     { key: "benefice_net", label: "Bénéfice net avant impôts", isBold: true },
     { key: "impots_header", label: "Calcul de l'impôt", isHeader: true },

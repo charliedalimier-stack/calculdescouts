@@ -15,6 +15,7 @@ import { useFinancialPlan, FinancialPlanData, FiscalParams } from "@/hooks/useFi
 import { useProjectSettings } from "@/hooks/useProjectSettings";
 import { useTaxBrackets } from "@/hooks/useTaxBrackets";
 import { EXPENSE_CATEGORIES } from "@/hooks/useExpenses";
+import { FinancialStressTest } from "@/components/financial/FinancialStressTest";
 
 interface FinancialPlanRow {
   key: string;
@@ -290,6 +291,15 @@ const PlanFinancier = () => {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Stress Test Section */}
+        {planData && (
+          <FinancialStressTest
+            baseData={planData.yearN.budget}
+            fiscalParams={fiscalParams}
+            year={selectedYear}
+          />
         )}
 
         <Card className="border-dashed">

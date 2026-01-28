@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, TrendingDown, Target, BarChart3, Edit3, Eye, Calendar } from "lucide-react";
+import { TrendingUp, TrendingDown, Target, BarChart3, Edit3, Eye } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getCurrentYear } from "@/lib/dateOptions";
 import { 
@@ -15,10 +15,9 @@ import { SeasonalityEditor } from "@/components/sales/SeasonalityEditor";
 import { MonthlyViewTable } from "@/components/sales/MonthlyViewTable";
 import { ObjectivesComparisonTable } from "@/components/sales/ObjectivesComparisonTable";
 import { SalesCharts } from "@/components/sales/SalesCharts";
-import { MonthlyReelEntryTable } from "@/components/sales/MonthlyReelEntryTable";
 import { PeriodSelector, DataMode } from "@/components/layout/PeriodSelector";
 
-type ViewMode = 'entry' | 'monthly' | 'comparison' | 'monthly-entry';
+type ViewMode = 'entry' | 'monthly' | 'comparison';
 
 const Sales = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('entry');
@@ -83,17 +82,11 @@ const Sales = () => {
           <TabsList>
             <TabsTrigger value="entry" className="flex items-center gap-2">
               <Edit3 className="h-4 w-4" />
-              Saisie annuelle
+              Saisie
             </TabsTrigger>
-            {dataMode === 'reel' && (
-              <TabsTrigger value="monthly-entry" className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                Saisie mensuelle
-              </TabsTrigger>
-            )}
             <TabsTrigger value="monthly" className="flex items-center gap-2">
               <Eye className="h-4 w-4" />
-              Vue mensuelle
+              Mensuel
             </TabsTrigger>
             <TabsTrigger value="comparison" className="flex items-center gap-2">
               <Target className="h-4 w-4" />
@@ -184,7 +177,7 @@ const Sales = () => {
 
       {/* Main Content */}
       <div className="space-y-6">
-        {/* Annual Entry View */}
+        {/* Entry View */}
         {viewMode === 'entry' && (
           <>
             <SeasonalityEditor
@@ -201,11 +194,6 @@ const Sales = () => {
               onUpdate={(params) => setAnnualSales.mutate(params)}
             />
           </>
-        )}
-
-        {/* Monthly Entry View (Reel mode only) */}
-        {viewMode === 'monthly-entry' && dataMode === 'reel' && (
-          <MonthlyReelEntryTable year={selectedYear} />
         )}
 
         {/* Monthly View */}

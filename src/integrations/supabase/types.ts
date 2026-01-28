@@ -323,63 +323,6 @@ export type Database = {
           },
         ]
       }
-      monthly_sales_reel: {
-        Row: {
-          categorie_prix: string
-          created_at: string
-          id: string
-          month: string
-          prix_ht_override: number | null
-          product_id: string
-          project_id: string
-          quantite: number
-          updated_at: string
-          user_id: string
-          year: number
-        }
-        Insert: {
-          categorie_prix?: string
-          created_at?: string
-          id?: string
-          month: string
-          prix_ht_override?: number | null
-          product_id: string
-          project_id: string
-          quantite?: number
-          updated_at?: string
-          user_id: string
-          year: number
-        }
-        Update: {
-          categorie_prix?: string
-          created_at?: string
-          id?: string
-          month?: string
-          prix_ht_override?: number | null
-          product_id?: string
-          project_id?: string
-          quantite?: number
-          updated_at?: string
-          user_id?: string
-          year?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "monthly_sales_reel_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "monthly_sales_reel_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       packaging: {
         Row: {
           cout_unitaire: number

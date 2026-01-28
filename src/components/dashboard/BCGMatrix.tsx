@@ -43,13 +43,14 @@ interface BCGMatrixProps {
 }
 
 export function BCGMatrix({ year = new Date().getFullYear(), mode = 'simulation' }: BCGMatrixProps) {
-  const { productsWithCosts, isLoadingWithCosts } = useProducts(mode);
+  // Always use 'simulation' for products as it's the source of truth for the catalog
+  const { productsWithCosts, isLoadingWithCosts } = useProducts('simulation');
   const { productSales, isLoading: isLoadingSales } = useProductSalesAnalysis(year);
 
   // Convert mode to data mode for selecting correct sales data
   const dataMode = mode === 'simulation' ? 'budget' : 'reel';
 
-  console.log('[BCGMatrix] year:', year, 'mode:', mode, 'dataMode:', dataMode, 'productSales:', productSales?.length);
+  console.log('[BCGMatrix] year:', year, 'mode:', mode, 'dataMode:', dataMode, 'productSales:', productSales?.length, 'products:', productsWithCosts?.length);
 
   const { products, avgMargin, avgVolume, maxMargin, maxVolume } = useMemo(() => {
     if (!productsWithCosts || !productSales || productSales.length === 0) {

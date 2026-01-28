@@ -23,6 +23,7 @@ interface FinancialPlanRow {
   isHeader?: boolean;
   isBold?: boolean;
   isExpenseCategory?: boolean;
+  isMuted?: boolean;
 }
 
 const getFinancialPlanRows = (chargeCategories: string[]): FinancialPlanRow[] => {
@@ -45,7 +46,7 @@ const getFinancialPlanRows = (chargeCategories: string[]): FinancialPlanRow[] =>
   });
 
   baseRows.push(
-    { key: "total_charges", label: "Total charges professionnelles", isBold: true },
+    { key: "total_charges", label: "Total charges professionnelles", isBold: true, isMuted: true },
     { key: "revenu_brut", label: "Revenu brut", isBold: true },
     { key: "cotisations_sociales", label: "Cotisations sociales" },
     { key: "benefice_net", label: "Bénéfice net avant impôts", isBold: true },
@@ -260,7 +261,7 @@ const PlanFinancier = () => {
                       };
 
                       return (
-                        <TableRow key={index} className={row.isExpenseCategory ? "text-muted-foreground" : ""}>
+                        <TableRow key={index} className={`${row.isExpenseCategory ? "text-muted-foreground" : ""} ${row.isMuted ? "bg-muted/30 text-muted-foreground" : ""}`}>
                           <TableCell className={row.isBold ? "font-semibold" : ""}>
                             {row.label}
                           </TableCell>

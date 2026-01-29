@@ -56,7 +56,7 @@ export function ScenarioComparison({ scenarios }: ScenarioComparisonProps) {
         );
       default:
         return (
-          <Badge className="gap-1 bg-chart-2/20 text-chart-2">
+          <Badge className="gap-1 bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
             <ShieldCheck className="h-3 w-3" />
             Faible
           </Badge>
@@ -66,8 +66,8 @@ export function ScenarioComparison({ scenarios }: ScenarioComparisonProps) {
 
   // Trier par niveau de risque
   const sortedScenarios = [...scenarios].sort((a, b) => {
-    const riskOrder = { critical: 0, high: 1, medium: 2, low: 3 };
-    return riskOrder[a.risqueLevel] - riskOrder[b.risqueLevel];
+    const riskOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+    return (riskOrder[a.risqueLevel] ?? 4) - (riskOrder[b.risqueLevel] ?? 4);
   });
 
   return (
@@ -79,85 +79,87 @@ export function ScenarioComparison({ scenarios }: ScenarioComparisonProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Scénario</TableHead>
-                <TableHead>Risque</TableHead>
-                <TableHead className="text-right">Besoin trésorerie</TableHead>
-                <TableHead className="text-right">Tension critique</TableHead>
-                <TableHead className="text-right">Impact CA</TableHead>
-                <TableHead className="text-right">Récupération</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedScenarios.map((scenario, index) => (
-                <TableRow 
-                  key={index}
-                  className={
-                    scenario.risqueLevel === 'critical' ? 'bg-destructive/5' :
-                    scenario.risqueLevel === 'high' ? 'bg-orange-50 dark:bg-orange-950/20' :
-                    undefined
-                  }
-                >
-                  <TableCell className="font-medium">
-                    {scenario.scenarioName}
-                  </TableCell>
-                  <TableCell>
-                    {getRiskBadge(scenario.risqueLevel)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <span className={scenario.besoinTresorerieMax > 0 ? 'text-destructive font-medium' : ''}>
-                      {formatCurrency(scenario.besoinTresorerieMax)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {scenario.moisTensionCritique 
-                      ? <span className="text-amber-600 dark:text-amber-400">Mois {scenario.moisTensionCritique}</span>
-                      : <span className="text-muted-foreground">-</span>
-                    }
-                  </TableCell>
-                  <TableCell className="text-right text-destructive">
-                    -{formatCurrency(Math.abs(scenario.impactTotalCA))}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {scenario.delaiRecuperationMois !== null
-                      ? <span className="text-chart-2">{scenario.delaiRecuperationMois} mois</span>
-                      : <span className="text-muted-foreground">N/A</span>
-                    }
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-
-        {scenarios.length === 0 && (
+        {scenarios.length === 0 ? (
           <div className="py-8 text-center text-muted-foreground">
             Sélectionnez des scénarios pour les comparer
           </div>
-        )}
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Scénario</TableHead>
+                    <TableHead>Risque</TableHead>
+                    <TableHead className="text-right">Besoin trésorerie</TableHead>
+                    <TableHead className="text-right">Tension critique</TableHead>
+                    <TableHead className="text-right">Impact CA</TableHead>
+                    <TableHead className="text-right">Récupération</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sortedScenarios.map((scenario, index) => (
+                    <TableRow 
+                      key={`${scenario.scenarioName}-${index}`}
+                      className={
+                        scenario.risqueLevel === 'critical' ? 'bg-destructive/5' :
+                        scenario.risqueLevel === 'high' ? 'bg-orange-50 dark:bg-orange-950/20' :
+                        undefined
+                      }
+                    >
+                      <TableCell className="font-medium">
+                        {scenario.scenarioName}
+                      </TableCell>
+                      <TableCell>
+                        {getRiskBadge(scenario.risqueLevel)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className={scenario.besoinTresorerieMax > 0 ? 'text-destructive font-medium' : ''}>
+                          {formatCurrency(scenario.besoinTresorerieMax)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {scenario.moisTensionCritique 
+                          ? <span className="text-amber-600 dark:text-amber-400">Mois {scenario.moisTensionCritique}</span>
+                          : <span className="text-muted-foreground">-</span>
+                        }
+                      </TableCell>
+                      <TableCell className="text-right text-destructive">
+                        -{formatCurrency(Math.abs(scenario.impactTotalCA))}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {scenario.delaiRecuperationMois !== null
+                          ? <span className="text-emerald-600 dark:text-emerald-400">{scenario.delaiRecuperationMois} mois</span>
+                          : <span className="text-muted-foreground">N/A</span>
+                        }
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
 
-        {/* Légende */}
-        <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <ShieldX className="h-3 w-3 text-destructive" />
-            <span>Critique : Besoin &gt; 50K€ ou tension &lt; 3 mois</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <ShieldAlert className="h-3 w-3 text-orange-500" />
-            <span>Élevé : Besoin &gt; 20K€ ou tension &lt; 5 mois</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Shield className="h-3 w-3 text-amber-500" />
-            <span>Modéré : Impact notable mais gérable</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <ShieldCheck className="h-3 w-3 text-chart-2" />
-            <span>Faible : Impact limité</span>
-          </div>
-        </div>
+            {/* Légende */}
+            <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <ShieldX className="h-3 w-3 text-destructive" />
+                <span>Critique : Besoin &gt; 50K€ ou tension &lt; 3 mois</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <ShieldAlert className="h-3 w-3 text-orange-500" />
+                <span>Élevé : Besoin &gt; 20K€ ou tension &lt; 5 mois</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Shield className="h-3 w-3 text-amber-500" />
+                <span>Modéré : Impact notable mais gérable</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <ShieldCheck className="h-3 w-3 text-emerald-500" />
+                <span>Faible : Impact limité</span>
+              </div>
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );

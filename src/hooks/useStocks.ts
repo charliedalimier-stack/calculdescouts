@@ -124,7 +124,7 @@ export function useStocks() {
         acc.totalIngredients += value;
       } else if (stock.type_stock === "packaging") {
         acc.totalPackaging += value;
-      } else if (stock.type_stock === "product") {
+      } else if (stock.type_stock === "produit_fini") {
         acc.totalProducts += value;
       }
 

@@ -11,7 +11,8 @@ import {
   Clock, 
   Package,
   DollarSign,
-  Save
+  Save,
+  RotateCcw
 } from "lucide-react";
 
 interface ScenarioBuilderProps {
@@ -20,14 +21,16 @@ interface ScenarioBuilderProps {
   isLoading?: boolean;
 }
 
+const defaultParams: StressTestParams = {
+  baisseVentesPct: 0,
+  hausseCoutMatieresPct: 0,
+  retardPaiementJours: 0,
+  augmentationStockPct: 0,
+};
+
 export function ScenarioBuilder({ onCalculate, onSave, isLoading }: ScenarioBuilderProps) {
   const [scenarioName, setScenarioName] = useState('Mon scénario personnalisé');
-  const [params, setParams] = useState<StressTestParams>({
-    baisseVentesPct: 0,
-    hausseCoutMatieresPct: 0,
-    retardPaiementJours: 0,
-    augmentationStockPct: 0,
-  });
+  const [params, setParams] = useState<StressTestParams>(defaultParams);
 
   const handleParamChange = (key: keyof StressTestParams, value: number) => {
     const newParams = { ...params, [key]: value };
@@ -36,8 +39,16 @@ export function ScenarioBuilder({ onCalculate, onSave, isLoading }: ScenarioBuil
   };
 
   const handleSave = () => {
+    if (!scenarioName.trim()) return;
     onSave(scenarioName, params);
   };
+
+  const handleReset = () => {
+    setParams(defaultParams);
+    onCalculate(defaultParams);
+  };
+
+  const hasChanges = Object.values(params).some(v => v !== 0);
 
   return (
     <Card>
@@ -163,12 +174,22 @@ export function ScenarioBuilder({ onCalculate, onSave, isLoading }: ScenarioBuil
         <div className="flex gap-2 pt-2">
           <Button 
             onClick={handleSave} 
-            disabled={isLoading}
+            disabled={isLoading || !scenarioName.trim()}
             className="flex-1 gap-2"
           >
             <Save className="h-4 w-4" />
-            Sauvegarder le scénario
+            Sauvegarder
           </Button>
+          {hasChanges && (
+            <Button 
+              variant="outline"
+              onClick={handleReset}
+              className="gap-2"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Reset
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

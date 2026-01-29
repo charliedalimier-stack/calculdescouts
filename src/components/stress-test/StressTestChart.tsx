@@ -28,6 +28,24 @@ export function StressTestChart({ data, scenarioName }: StressTestChartProps) {
     }).format(value);
   };
 
+  if (!data || data.length === 0) {
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <TrendingDown className="h-4 w-4 text-destructive" />
+            Projection de trésorerie - {scenarioName}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex h-[350px] items-center justify-center text-muted-foreground">
+            Aucune donnée disponible pour afficher le graphique
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   // Préparer les données pour le graphique
   const chartData = data.map(d => ({
     mois: d.monthLabel,
@@ -38,7 +56,7 @@ export function StressTestChart({ data, scenarioName }: StressTestChartProps) {
 
   const minValue = Math.min(...data.map(d => Math.min(d.cumulBase, d.cumulStress)));
   const maxValue = Math.max(...data.map(d => Math.max(d.cumulBase, d.cumulStress)));
-  const yDomain = [Math.min(minValue * 1.1, 0), maxValue * 1.1];
+  const yDomain: [number, number] = [Math.min(minValue * 1.1, 0), maxValue * 1.1];
 
   return (
     <Card>
@@ -61,15 +79,17 @@ export function StressTestChart({ data, scenarioName }: StressTestChartProps) {
                 <stop offset="95%" stopColor="hsl(var(--destructive))" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
             <XAxis 
               dataKey="mois" 
-              className="text-xs"
+              tick={{ fontSize: 12 }}
+              stroke="hsl(var(--muted-foreground))"
             />
             <YAxis 
               tickFormatter={(v) => formatCurrency(v)}
               domain={yDomain}
-              className="text-xs"
+              tick={{ fontSize: 12 }}
+              stroke="hsl(var(--muted-foreground))"
             />
             <Tooltip
               formatter={(value: number, name: string) => [formatCurrency(value), name]}
@@ -86,12 +106,6 @@ export function StressTestChart({ data, scenarioName }: StressTestChartProps) {
               y={0} 
               stroke="hsl(var(--muted-foreground))" 
               strokeDasharray="3 3"
-              label={{
-                value: 'Équilibre',
-                position: 'insideBottomRight',
-                fill: 'hsl(var(--muted-foreground))',
-                fontSize: 10,
-              }}
             />
             
             {/* Zone de danger */}

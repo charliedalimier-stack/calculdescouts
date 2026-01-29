@@ -1,19 +1,19 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '@/contexts/ProjectContext';
-import { useCashFlow, CashFlowData } from './useCashFlow';
+import { useCashFlow } from './useCashFlow';
 import { toast } from 'sonner';
 
 export interface StressScenario {
   id: string;
   project_id: string;
   nom_scenario: string;
-  baisse_ventes_pct: number;
-  hausse_cout_matieres_pct: number;
-  retard_paiement_jours: number;
-  augmentation_stock_pct: number;
-  cash_flow_projete: number[];
-  besoin_tresorerie_max: number;
+  baisse_ventes_pct: number | null;
+  hausse_cout_matieres_pct: number | null;
+  retard_paiement_jours: number | null;
+  augmentation_stock_pct: number | null;
+  cash_flow_projete: number[] | null;
+  besoin_tresorerie_max: number | null;
   mois_tension_critique: number | null;
   created_at: string;
 }
@@ -113,12 +113,12 @@ export function useStressTest() {
 
   // Calculer l'impact d'un stress test
   const calculateStressTest = (params: StressTestParams): StressTestResult[] => {
-    if (cashFlowData.length === 0) return [];
+    if (!cashFlowData || cashFlowData.length === 0) return [];
 
     const results: StressTestResult[] = [];
     let cumulBase = 0;
     let cumulStress = 0;
-    let retardBuffer: number[] = []; // Buffer pour simuler les retards de paiement
+    const retardBuffer: number[] = []; // Buffer pour simuler les retards de paiement
 
     cashFlowData.forEach((entry, index) => {
       // Impact sur les encaissements
@@ -164,7 +164,7 @@ export function useStressTest() {
 
       results.push({
         mois: index + 1,
-        monthLabel: entry.monthLabel,
+        monthLabel: entry.monthLabel || `M${index + 1}`,
         cashFlowBase,
         cashFlowStress,
         cumulBase,
@@ -223,9 +223,9 @@ export function useStressTest() {
 
     // Niveau de risque
     let risqueLevel: 'low' | 'medium' | 'high' | 'critical' = 'low';
-    if (besoinTresorerieMax > 50000 || moisTensionCritique !== null && moisTensionCritique <= 2) {
+    if (besoinTresorerieMax > 50000 || (moisTensionCritique !== null && moisTensionCritique <= 2)) {
       risqueLevel = 'critical';
-    } else if (besoinTresorerieMax > 20000 || moisTensionCritique !== null && moisTensionCritique <= 4) {
+    } else if (besoinTresorerieMax > 20000 || (moisTensionCritique !== null && moisTensionCritique <= 4)) {
       risqueLevel = 'high';
     } else if (besoinTresorerieMax > 5000 || moisTensionCritique !== null) {
       risqueLevel = 'medium';

@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '@/contexts/ProjectContext';
 import { toast } from 'sonner';
 
+export type CashFlowMode = 'budget' | 'reel';
+
 export interface CashFlowEntry {
   id: string;
   project_id: string;
@@ -26,20 +28,36 @@ export interface CashFlowData {
   cumul: number;
 }
 
-export function useCashFlow() {
+export interface UseCashFlowOptions {
+  mode?: CashFlowMode;
+  year?: number;
+}
+
+export function useCashFlow(options: UseCashFlowOptions = {}) {
+  const { mode = 'budget', year } = options;
   const { currentProject } = useProject();
   const queryClient = useQueryClient();
 
   const { data: cashFlowEntries = [], isLoading } = useQuery({
-    queryKey: ['cash-flow', currentProject?.id],
+    queryKey: ['cash-flow', currentProject?.id, mode, year],
     queryFn: async () => {
       if (!currentProject?.id) return [];
       
-      const { data, error } = await supabase
+      let query = supabase
         .from('cash_flow')
         .select('*')
         .eq('project_id', currentProject.id)
+        .eq('mode', mode)
         .order('mois', { ascending: true });
+      
+      // Filter by year if provided
+      if (year) {
+        const startOfYear = `${year}-01-01`;
+        const endOfYear = `${year}-12-31`;
+        query = query.gte('mois', startOfYear).lte('mois', endOfYear);
+      }
+      
+      const { data, error } = await query;
       
       if (error) throw error;
       return data as CashFlowEntry[];
@@ -98,6 +116,7 @@ export function useCashFlow() {
           decaissements: entry.decaissements,
           delai_paiement_jours: entry.delai_paiement_jours,
           notes: entry.notes || null,
+          mode: mode,
         })
         .select()
         .single();
@@ -106,7 +125,7 @@ export function useCashFlow() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cash-flow', currentProject?.id] });
+      queryClient.invalidateQueries({ queryKey: ['cash-flow', currentProject?.id, mode, year] });
       toast.success('Entrée cash-flow ajoutée');
     },
     onError: (error) => {
@@ -127,7 +146,7 @@ export function useCashFlow() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cash-flow', currentProject?.id] });
+      queryClient.invalidateQueries({ queryKey: ['cash-flow', currentProject?.id, mode, year] });
       toast.success('Entrée mise à jour');
     },
     onError: (error) => {
@@ -145,7 +164,7 @@ export function useCashFlow() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cash-flow', currentProject?.id] });
+      queryClient.invalidateQueries({ queryKey: ['cash-flow', currentProject?.id, mode, year] });
       toast.success('Entrée supprimée');
     },
     onError: (error) => {

@@ -34,10 +34,11 @@ import {
   ReferenceLine,
 } from "recharts";
 import { Wallet, TrendingUp, TrendingDown, AlertTriangle, Plus, Trash2, Receipt } from "lucide-react";
-import { useCashFlow } from "@/hooks/useCashFlow";
+import { useCashFlow, CashFlowMode } from "@/hooks/useCashFlow";
 import { useExpenses } from "@/hooks/useExpenses";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { DEFINITIONS } from "@/lib/pedagogicDefinitions";
+import { PeriodSelector, DataMode } from "@/components/layout/PeriodSelector";
 
 const getSoldeBadge = (solde: number) => {
   if (solde > 0) {
@@ -57,6 +58,14 @@ const getSoldeBadge = (solde: number) => {
 };
 
 const CashFlow = () => {
+  // Period selection state
+  const currentDate = new Date();
+  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
+  const [dataMode, setDataMode] = useState<DataMode>('budget');
+
+  // Map DataMode to CashFlowMode
+  const cashFlowMode: CashFlowMode = dataMode === 'budget' ? 'budget' : 'reel';
+
   const { 
     cashFlowEntries, 
     cashFlowData, 
@@ -65,7 +74,7 @@ const CashFlow = () => {
     isLoading,
     addCashFlowEntry,
     deleteCashFlowEntry,
-  } = useCashFlow();
+  } = useCashFlow({ mode: cashFlowMode, year: selectedYear });
   
   const { summary: expensesSummary, isLoading: isLoadingExpenses } = useExpenses();
 
@@ -77,6 +86,11 @@ const CashFlow = () => {
     delai_paiement_jours: 30,
     notes: '',
   });
+
+  const handlePeriodChange = (params: { month?: number; year: number; mode: DataMode }) => {
+    setSelectedYear(params.year);
+    setDataMode(params.mode);
+  };
 
   const handleAddEntry = () => {
     const data = {
@@ -158,6 +172,17 @@ const CashFlow = () => {
       title="Cash-flow"
       subtitle="Suivez votre trésorerie mensuelle"
     >
+      {/* Period Selector */}
+      <div className="mb-6">
+        <PeriodSelector
+          year={selectedYear}
+          mode={dataMode}
+          showMonth={false}
+          showMode={true}
+          onChange={handlePeriodChange}
+        />
+      </div>
+
       {/* Alert if negative */}
       {hasNegativeCashFlow && (
         <Card className="mb-6 border-destructive/50 bg-destructive/5">

@@ -1,12 +1,7 @@
 import { useState } from "react";
-import { toast } from "sonner";
-import { cashFlowSchema, getValidationError } from "@/lib/validations";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -17,13 +12,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
   AreaChart,
   Area,
   XAxis,
@@ -32,19 +20,25 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
+  BarChart,
+  Bar,
+  Legend,
 } from "recharts";
-import { Wallet, TrendingUp, TrendingDown, AlertTriangle, Plus, Trash2, Receipt } from "lucide-react";
-import { useCashFlow, CashFlowMode } from "@/hooks/useCashFlow";
-import { useExpenses } from "@/hooks/useExpenses";
+import { Wallet, TrendingUp, TrendingDown, AlertTriangle, Receipt, Package, Boxes, Zap } from "lucide-react";
+import { useAutoCashFlow, CashFlowMode } from "@/hooks/useAutoCashFlow";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { DEFINITIONS } from "@/lib/pedagogicDefinitions";
 import { PeriodSelector, DataMode } from "@/components/layout/PeriodSelector";
+
+const formatCurrency = (value: number) => {
+  return value.toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €';
+};
 
 const getSoldeBadge = (solde: number) => {
   if (solde > 0) {
     return (
       <Badge className="bg-primary/10 text-primary border-primary/20">
-        +{solde.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
+        +{formatCurrency(solde)}
       </Badge>
     );
   } else if (solde === 0) {
@@ -52,7 +46,7 @@ const getSoldeBadge = (solde: number) => {
   }
   return (
     <Badge className="bg-destructive/10 text-destructive border-destructive/20">
-      {solde.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
+      {formatCurrency(solde)}
     </Badge>
   );
 };
@@ -67,86 +61,18 @@ const CashFlow = () => {
   const cashFlowMode: CashFlowMode = dataMode === 'budget' ? 'budget' : 'reel';
 
   const { 
-    cashFlowEntries, 
-    cashFlowData, 
-    currentMonth, 
-    hasNegativeCashFlow, 
+    monthlyData,
+    summary,
+    currentMonthData,
     isLoading,
-    addCashFlowEntry,
-    deleteCashFlowEntry,
-  } = useCashFlow({ mode: cashFlowMode, year: selectedYear });
-  
-  const { summary: expensesSummary, isLoading: isLoadingExpenses } = useExpenses();
-
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newEntry, setNewEntry] = useState({
-    mois: new Date().toISOString().slice(0, 7) + '-01',
-    encaissements: 0,
-    decaissements: 0,
-    delai_paiement_jours: 30,
-    notes: '',
-  });
+  } = useAutoCashFlow({ mode: cashFlowMode, year: selectedYear });
 
   const handlePeriodChange = (params: { month?: number; year: number; mode: DataMode }) => {
     setSelectedYear(params.year);
     setDataMode(params.mode);
   };
 
-  const handleAddEntry = () => {
-    const data = {
-      mois: newEntry.mois,
-      encaissements: newEntry.encaissements,
-      decaissements: newEntry.decaissements,
-      delai_paiement_jours: newEntry.delai_paiement_jours,
-      notes: newEntry.notes || null,
-    };
-
-    const error = getValidationError(cashFlowSchema, data);
-    if (error) {
-      toast.error(error);
-      return;
-    }
-
-    addCashFlowEntry.mutate(data, {
-      onSuccess: () => {
-        setIsDialogOpen(false);
-        setNewEntry({
-          mois: new Date().toISOString().slice(0, 7) + '-01',
-          encaissements: 0,
-          decaissements: 0,
-          delai_paiement_jours: 30,
-          notes: '',
-        });
-      },
-    });
-  };
-
-  // Calculate cash flow data with expenses
-  const cashFlowDataWithExpenses = cashFlowData.map(row => {
-    const monthKey = row.month.slice(0, 7);
-    const monthExpenses = expensesSummary.by_month[monthKey] || 0;
-    return {
-      ...row,
-      fraisPro: monthExpenses,
-      soldeApresFrais: row.solde - monthExpenses,
-    };
-  });
-
-  // Calculate cumulative with expenses
-  let cumulApresFrais = 0;
-  const cashFlowDataFinal = cashFlowDataWithExpenses.map(row => {
-    cumulApresFrais += row.soldeApresFrais;
-    return {
-      ...row,
-      cumulApresFrais,
-    };
-  });
-
-  const currentMonthExpenses = expensesSummary.by_month[new Date().toISOString().slice(0, 7)] || 0;
-  const soldeApresFrais = currentMonth.solde - currentMonthExpenses;
-  const hasNegativeAfterExpenses = cashFlowDataFinal.some(d => d.cumulApresFrais < 0);
-
-  if (isLoading || isLoadingExpenses) {
+  if (isLoading) {
     return (
       <AppLayout title="Cash-flow" subtitle="Suivez votre trésorerie mensuelle">
         <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -167,6 +93,8 @@ const CashFlow = () => {
     );
   }
 
+  const hasData = summary.total_encaissements > 0 || summary.total_decaissements_production > 0;
+
   return (
     <AppLayout
       title="Cash-flow"
@@ -184,36 +112,38 @@ const CashFlow = () => {
       </div>
 
       {/* Alert if negative */}
-      {hasNegativeCashFlow && (
+      {summary.has_negative && (
         <Card className="mb-6 border-destructive/50 bg-destructive/5">
           <CardContent className="flex items-center gap-4 p-4">
             <AlertTriangle className="h-5 w-5 text-destructive" />
             <div>
               <p className="font-medium text-destructive">Attention : trésorerie négative détectée</p>
               <p className="text-sm text-muted-foreground">
-                Certains mois présentent un solde cumulé négatif. Revoyez vos délais de paiement ou votre plan de production.
+                La trésorerie devient négative à partir de {summary.first_negative_month}. 
+                Revoyez vos délais de paiement ou votre plan de production.
               </p>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Alert for expenses impact */}
-      {hasNegativeAfterExpenses && !hasNegativeCashFlow && (
+      {/* No data alert */}
+      {!hasData && (
         <Card className="mb-6 border-chart-4/50 bg-chart-4/5">
           <CardContent className="flex items-center gap-4 p-4">
             <Receipt className="h-5 w-5 text-chart-4" />
             <div>
-              <p className="font-medium text-chart-4">Impact des frais professionnels</p>
+              <p className="font-medium text-chart-4">Aucune donnée pour cette période</p>
               <p className="text-sm text-muted-foreground">
-                Votre trésorerie production est positive, mais devient négative après prise en compte des frais professionnels.
+                Pour voir le cash-flow automatique, ajoutez des ventes annuelles en mode {dataMode === 'budget' ? 'Budget' : 'Réel'} 
+                {' '}dans le module Ventes.
               </p>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Summary Cards - Row 1 */}
+      {/* Summary Cards - Row 1: Current Month */}
       <div className="mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardContent className="p-6">
@@ -223,10 +153,10 @@ const CashFlow = () => {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  Encaissements
+                  Encaissements (mois en cours)
                   <InfoTooltip {...DEFINITIONS.encaissements} size="sm" />
                 </p>
-                <p className="text-xl font-bold">{currentMonth.encaissements.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €</p>
+                <p className="text-xl font-bold">{formatCurrency(currentMonthData.encaissements)}</p>
               </div>
             </div>
           </CardContent>
@@ -239,8 +169,8 @@ const CashFlow = () => {
                 <TrendingDown className="h-5 w-5 text-destructive" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Décaissements (prod.)</p>
-                <p className="text-xl font-bold">{currentMonth.decaissements.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €</p>
+                <p className="text-sm text-muted-foreground">Décaissements prod. (mois)</p>
+                <p className="text-xl font-bold">{formatCurrency(currentMonthData.decaissements_production)}</p>
               </div>
             </div>
           </CardContent>
@@ -253,28 +183,28 @@ const CashFlow = () => {
                 <Receipt className="h-5 w-5 text-chart-5" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Frais professionnels</p>
-                <p className="text-xl font-bold">{currentMonthExpenses.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €</p>
+                <p className="text-sm text-muted-foreground">Frais professionnels (mois)</p>
+                <p className="text-xl font-bold">{formatCurrency(currentMonthData.frais_professionnels)}</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Summary Cards - Row 2 */}
+      {/* Summary Cards - Row 2: Soldes */}
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                currentMonth.solde >= 0 ? "bg-primary/10" : "bg-destructive/10"
+                currentMonthData.solde_production >= 0 ? "bg-primary/10" : "bg-destructive/10"
               }`}>
-                <Wallet className={`h-5 w-5 ${currentMonth.solde >= 0 ? "text-primary" : "text-destructive"}`} />
+                <Wallet className={`h-5 w-5 ${currentMonthData.solde_production >= 0 ? "text-primary" : "text-destructive"}`} />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Solde production</p>
-                <p className={`text-xl font-bold ${currentMonth.solde >= 0 ? "text-primary" : "text-destructive"}`}>
-                  {currentMonth.solde >= 0 ? "+" : ""}{currentMonth.solde.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
+                <p className="text-sm text-muted-foreground">Solde production (mois)</p>
+                <p className={`text-xl font-bold ${currentMonthData.solde_production >= 0 ? "text-primary" : "text-destructive"}`}>
+                  {currentMonthData.solde_production >= 0 ? "+" : ""}{formatCurrency(currentMonthData.solde_production)}
                 </p>
               </div>
             </div>
@@ -285,14 +215,14 @@ const CashFlow = () => {
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                soldeApresFrais >= 0 ? "bg-primary/10" : "bg-destructive/10"
+                currentMonthData.solde_apres_frais >= 0 ? "bg-primary/10" : "bg-destructive/10"
               }`}>
-                <Wallet className={`h-5 w-5 ${soldeApresFrais >= 0 ? "text-primary" : "text-destructive"}`} />
+                <Wallet className={`h-5 w-5 ${currentMonthData.solde_apres_frais >= 0 ? "text-primary" : "text-destructive"}`} />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Solde après frais</p>
-                <p className={`text-xl font-bold ${soldeApresFrais >= 0 ? "text-primary" : "text-destructive"}`}>
-                  {soldeApresFrais >= 0 ? "+" : ""}{soldeApresFrais.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
+                <p className="text-sm text-muted-foreground">Solde après frais (mois)</p>
+                <p className={`text-xl font-bold ${currentMonthData.solde_apres_frais >= 0 ? "text-primary" : "text-destructive"}`}>
+                  {currentMonthData.solde_apres_frais >= 0 ? "+" : ""}{formatCurrency(currentMonthData.solde_apres_frais)}
                 </p>
               </div>
             </div>
@@ -302,38 +232,68 @@ const CashFlow = () => {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent">
-                <Wallet className="h-5 w-5 text-accent-foreground" />
+              <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+                summary.solde_final >= 0 ? "bg-accent" : "bg-destructive/10"
+              }`}>
+                <Wallet className={`h-5 w-5 ${summary.solde_final >= 0 ? "text-accent-foreground" : "text-destructive"}`} />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Trésorerie cumulée</p>
-                <p className="text-xl font-bold">{currentMonth.cumul.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €</p>
+                <p className="text-sm text-muted-foreground">Trésorerie fin d'année</p>
+                <p className={`text-xl font-bold ${summary.solde_final >= 0 ? "" : "text-destructive"}`}>
+                  {formatCurrency(summary.solde_final)}
+                </p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Chart */}
-      {cashFlowDataFinal.length > 0 && (
+      {/* Annual Summary Cards */}
+      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground mb-1">CA annuel</p>
+            <p className="text-lg font-semibold text-primary">{formatCurrency(summary.total_encaissements)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground mb-1">Coûts production annuels</p>
+            <p className="text-lg font-semibold text-destructive">{formatCurrency(summary.total_decaissements_production)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground mb-1">Frais pro. annuels</p>
+            <p className="text-lg font-semibold">{formatCurrency(summary.total_frais_professionnels)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground mb-1">Variation nette annuelle</p>
+            <p className={`text-lg font-semibold ${summary.total_variation_nette >= 0 ? "text-primary" : "text-destructive"}`}>
+              {summary.total_variation_nette >= 0 ? "+" : ""}{formatCurrency(summary.total_variation_nette)}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Chart - Treasury Evolution */}
+      {hasData && (
         <Card className="mb-8">
           <CardHeader>
             <CardTitle className="text-base font-semibold">
-              Évolution de la trésorerie
+              Évolution de la trésorerie cumulée
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={cashFlowDataFinal} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <AreaChart data={monthlyData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorCumul" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.3} />
                       <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="colorCumulFrais" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -352,10 +312,7 @@ const CashFlow = () => {
                       border: "1px solid hsl(var(--border))",
                       borderRadius: "var(--radius)",
                     }}
-                    formatter={(value: number, name: string) => [
-                      `${value.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €`,
-                      name === "cumul" ? "Trésorerie production" : name === "cumulApresFrais" ? "Trésorerie après frais" : name === "encaissements" ? "Encaissements" : "Décaissements",
-                    ]}
+                    formatter={(value: number) => [formatCurrency(value), "Trésorerie cumulée"]}
                   />
                   <Area
                     type="monotone"
@@ -366,16 +323,63 @@ const CashFlow = () => {
                     fill="url(#colorCumul)"
                     name="cumul"
                   />
-                  <Area
-                    type="monotone"
-                    dataKey="cumulApresFrais"
-                    stroke="hsl(var(--chart-2))"
-                    strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#colorCumulFrais)"
-                    name="cumulApresFrais"
-                  />
                 </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Chart - Monthly Flows */}
+      {hasData && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">
+              Flux mensuels
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis
+                    dataKey="monthLabel"
+                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                  />
+                  <YAxis
+                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                    tickFormatter={(value) => `${(value / 1000).toFixed(0)}k€`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "var(--radius)",
+                    }}
+                    formatter={(value: number, name: string) => {
+                      const labels: Record<string, string> = {
+                        encaissements: "Encaissements",
+                        decaissements_production: "Décaissements prod.",
+                        frais_professionnels: "Frais professionnels",
+                      };
+                      return [formatCurrency(value), labels[name] || name];
+                    }}
+                  />
+                  <Legend 
+                    formatter={(value) => {
+                      const labels: Record<string, string> = {
+                        encaissements: "Encaissements",
+                        decaissements_production: "Décaissements prod.",
+                        frais_professionnels: "Frais professionnels",
+                      };
+                      return labels[value] || value;
+                    }}
+                  />
+                  <Bar dataKey="encaissements" fill="hsl(var(--chart-1))" />
+                  <Bar dataKey="decaissements_production" fill="hsl(var(--chart-4))" />
+                  <Bar dataKey="frais_professionnels" fill="hsl(var(--chart-5))" />
+                </BarChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
@@ -384,117 +388,107 @@ const CashFlow = () => {
 
       {/* Detailed Table */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader>
           <CardTitle className="text-base font-semibold">
             Détail mensuel
           </CardTitle>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <Plus className="mr-2 h-4 w-4" />
-                Ajouter un mois
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Ajouter une entrée cash-flow</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-4">
-                <div className="space-y-2">
-                  <Label>Mois</Label>
-                  <Input
-                    type="month"
-                    value={newEntry.mois.slice(0, 7)}
-                    onChange={(e) => setNewEntry({ ...newEntry, mois: e.target.value + '-01' })}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Encaissements (€)</Label>
-                    <Input
-                      type="number"
-                      value={newEntry.encaissements}
-                      onChange={(e) => setNewEntry({ ...newEntry, encaissements: parseFloat(e.target.value) || 0 })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Décaissements (€)</Label>
-                    <Input
-                      type="number"
-                      value={newEntry.decaissements}
-                      onChange={(e) => setNewEntry({ ...newEntry, decaissements: parseFloat(e.target.value) || 0 })}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Délai de paiement (jours)</Label>
-                  <Input
-                    type="number"
-                    value={newEntry.delai_paiement_jours}
-                    onChange={(e) => setNewEntry({ ...newEntry, delai_paiement_jours: parseInt(e.target.value) || 30 })}
-                  />
-                </div>
-                <Button 
-                  className="w-full" 
-                  onClick={handleAddEntry}
-                  disabled={addCashFlowEntry.isPending}
-                >
-                  {addCashFlowEntry.isPending ? 'Ajout...' : 'Ajouter'}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
         </CardHeader>
         <CardContent className="overflow-x-auto">
-          {cashFlowEntries.length === 0 ? (
+          {!hasData ? (
             <div className="py-12 text-center text-muted-foreground">
-              Aucune entrée cash-flow. Ajoutez votre premier mois pour commencer le suivi.
+              Aucune donnée de cash-flow pour {selectedYear}. 
+              Ajoutez des ventes et des coûts dans les autres modules pour voir les calculs automatiques.
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Mois</TableHead>
-                  <TableHead className="text-right">Encaissements</TableHead>
-                  <TableHead className="text-right">Décaiss. prod.</TableHead>
-                  <TableHead className="text-right">Frais pro.</TableHead>
-                  <TableHead className="text-center">Solde prod.</TableHead>
-                  <TableHead className="text-center">Solde après frais</TableHead>
+                  <TableHead className="text-right">
+                    <span className="flex items-center justify-end gap-1">
+                      <TrendingUp className="h-4 w-4" /> Encaissements
+                    </span>
+                  </TableHead>
+                  <TableHead className="text-right">
+                    <span className="flex items-center justify-end gap-1">
+                      <Package className="h-4 w-4" /> Matières
+                    </span>
+                  </TableHead>
+                  <TableHead className="text-right">
+                    <span className="flex items-center justify-end gap-1">
+                      <Boxes className="h-4 w-4" /> Emballages
+                    </span>
+                  </TableHead>
+                  <TableHead className="text-right">
+                    <span className="flex items-center justify-end gap-1">
+                      <Zap className="h-4 w-4" /> Var. prod.
+                    </span>
+                  </TableHead>
+                  <TableHead className="text-right">
+                    <span className="flex items-center justify-end gap-1">
+                      <Receipt className="h-4 w-4" /> Frais pro.
+                    </span>
+                  </TableHead>
+                  <TableHead className="text-right">Solde net</TableHead>
                   <TableHead className="text-right">Cumul</TableHead>
-                  <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {cashFlowDataFinal.map((row, index) => (
+                {monthlyData.map((row) => (
                   <TableRow key={row.month}>
-                    <TableCell className="font-medium">
-                      {new Date(row.month).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
-                    </TableCell>
+                    <TableCell className="font-medium">{row.monthLabel}</TableCell>
                     <TableCell className="text-right text-primary">
-                      +{row.encaissements.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
+                      {formatCurrency(row.encaissements)}
                     </TableCell>
                     <TableCell className="text-right text-destructive">
-                      -{row.decaissements.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
+                      {row.achats_matieres > 0 ? `-${formatCurrency(row.achats_matieres)}` : '-'}
+                    </TableCell>
+                    <TableCell className="text-right text-destructive">
+                      {row.achats_emballages > 0 ? `-${formatCurrency(row.achats_emballages)}` : '-'}
+                    </TableCell>
+                    <TableCell className="text-right text-destructive">
+                      {row.couts_variables > 0 ? `-${formatCurrency(row.couts_variables)}` : '-'}
                     </TableCell>
                     <TableCell className="text-right text-chart-5">
-                      -{row.fraisPro.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
+                      {row.frais_professionnels > 0 ? `-${formatCurrency(row.frais_professionnels)}` : '-'}
                     </TableCell>
-                    <TableCell className="text-center">{getSoldeBadge(row.solde)}</TableCell>
-                    <TableCell className="text-center">{getSoldeBadge(row.soldeApresFrais)}</TableCell>
-                    <TableCell className={`text-right font-medium ${row.cumulApresFrais >= 0 ? '' : 'text-destructive'}`}>
-                      {row.cumulApresFrais.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
+                    <TableCell className="text-right">
+                      {getSoldeBadge(row.variation_nette)}
                     </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => deleteCashFlowEntry.mutate(cashFlowEntries[index].id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-muted-foreground" />
-                      </Button>
+                    <TableCell className="text-right font-semibold">
+                      <span className={row.cumul < 0 ? "text-destructive" : ""}>
+                        {formatCurrency(row.cumul)}
+                      </span>
                     </TableCell>
                   </TableRow>
                 ))}
+                {/* Total row */}
+                <TableRow className="bg-muted/50 font-semibold">
+                  <TableCell>Total annuel</TableCell>
+                  <TableCell className="text-right text-primary">
+                    {formatCurrency(summary.total_encaissements)}
+                  </TableCell>
+                  <TableCell className="text-right text-destructive">
+                    -{formatCurrency(monthlyData.reduce((sum, m) => sum + m.achats_matieres, 0))}
+                  </TableCell>
+                  <TableCell className="text-right text-destructive">
+                    -{formatCurrency(monthlyData.reduce((sum, m) => sum + m.achats_emballages, 0))}
+                  </TableCell>
+                  <TableCell className="text-right text-destructive">
+                    -{formatCurrency(monthlyData.reduce((sum, m) => sum + m.couts_variables, 0))}
+                  </TableCell>
+                  <TableCell className="text-right text-chart-5">
+                    -{formatCurrency(summary.total_frais_professionnels)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {getSoldeBadge(summary.total_variation_nette)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <span className={summary.solde_final < 0 ? "text-destructive" : ""}>
+                      {formatCurrency(summary.solde_final)}
+                    </span>
+                  </TableCell>
+                </TableRow>
               </TableBody>
             </Table>
           )}

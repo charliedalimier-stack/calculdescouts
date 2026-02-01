@@ -10,6 +10,7 @@ import { Percent, Timer, TrendingUp } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FiscalSettingsCard } from "@/components/settings/FiscalSettingsCard";
+import { TVASettingsCard, VATRegime, VATPeriodicite } from "@/components/settings/TVASettingsCard";
 
 const SettingsPage = () => {
   const { currentProject } = useProject();
@@ -22,8 +23,13 @@ const SettingsPage = () => {
     marge_cible: 40,
     marge_btb: 30,
     marge_distributeur: 15,
-    tva_vente: 5.5,
-    tva_achat: 20,
+    tva_vente: 6,
+    tva_achat: 21,
+    tva_standard: 21,
+    tva_reduit_1: 12,
+    tva_reduit_2: 6,
+    regime_tva: 'assujetti_normal' as VATRegime,
+    periodicite_tva: 'trimestrielle' as VATPeriodicite,
     seuil_stock_alerte: 10,
     delai_paiement_client: 30,
     delai_paiement_fournisseur: 30,
@@ -46,6 +52,11 @@ const SettingsPage = () => {
         marge_distributeur: settings.marge_distributeur,
         tva_vente: settings.tva_vente,
         tva_achat: settings.tva_achat,
+        tva_standard: settings.tva_standard,
+        tva_reduit_1: settings.tva_reduit_1,
+        tva_reduit_2: settings.tva_reduit_2,
+        regime_tva: settings.regime_tva as VATRegime,
+        periodicite_tva: (settings as any).periodicite_tva || 'trimestrielle',
         seuil_stock_alerte: settings.seuil_stock_alerte,
         delai_paiement_client: settings.delai_paiement_client,
         delai_paiement_fournisseur: settings.delai_paiement_fournisseur,
@@ -212,46 +223,11 @@ const SettingsPage = () => {
           </CardContent>
         </Card>
 
-        {/* TVA */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Percent className="h-5 w-5 text-primary" />
-              Taux de TVA
-            </CardTitle>
-            <CardDescription>
-              Configurez les taux de TVA par défaut
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="tva_vente">TVA sur ventes (%)</Label>
-              <Input
-                id="tva_vente"
-                type="number"
-                step="0.1"
-                value={formData.tva_vente}
-                onChange={(e) => handleChange('tva_vente', e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Taux réduit alimentaire par défaut
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="tva_achat">TVA sur achats (%)</Label>
-              <Input
-                id="tva_achat"
-                type="number"
-                step="0.1"
-                value={formData.tva_achat}
-                onChange={(e) => handleChange('tva_achat', e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Taux normal par défaut pour les achats
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        {/* TVA Belgique */}
+        <TVASettingsCard 
+          formData={formData}
+          onChange={handleChange}
+        />
 
         {/* Délais et alertes */}
         <Card>

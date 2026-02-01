@@ -792,6 +792,7 @@ export type Database = {
           marge_min: number
           nombre_enfants_charge: number
           pays: string
+          periodicite_tva: string
           project_id: string
           quotite_exemptee_base: number
           regime_tva: string
@@ -820,6 +821,7 @@ export type Database = {
           marge_min?: number
           nombre_enfants_charge?: number
           pays?: string
+          periodicite_tva?: string
           project_id: string
           quotite_exemptee_base?: number
           regime_tva?: string
@@ -848,6 +850,7 @@ export type Database = {
           marge_min?: number
           nombre_enfants_charge?: number
           pays?: string
+          periodicite_tva?: string
           project_id?: string
           quotite_exemptee_base?: number
           regime_tva?: string

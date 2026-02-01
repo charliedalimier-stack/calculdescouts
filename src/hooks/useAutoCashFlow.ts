@@ -1,25 +1,40 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '@/contexts/ProjectContext';
+import { useProjectSettings } from '@/hooks/useProjectSettings';
 
 export type CashFlowMode = 'budget' | 'reel';
 
 export interface MonthlyCashFlowData {
   month: string;
   monthLabel: string;
-  // Encaissements (Revenue)
-  encaissements: number;
-  // Décaissements production
-  achats_matieres: number;
-  achats_emballages: number;
-  couts_variables: number;
-  decaissements_production: number;
+  // Encaissements (Revenue HT)
+  encaissements_ht: number;
+  // TVA
+  tva_collectee: number;
+  encaissements_ttc: number;
+  // Décaissements production HT
+  achats_matieres_ht: number;
+  achats_emballages_ht: number;
+  couts_variables_ht: number;
+  decaissements_production_ht: number;
+  // TVA déductible
+  tva_deductible_matieres: number;
+  tva_deductible_emballages: number;
+  tva_deductible_variables: number;
+  tva_deductible_frais: number;
+  tva_deductible: number;
+  decaissements_production_ttc: number;
   // Frais professionnels
-  frais_professionnels: number;
-  // Soldes calculés
+  frais_professionnels_ht: number;
+  frais_professionnels_ttc: number;
+  // TVA nette
+  tva_nette: number;
+  // Soldes calculés (HT - pour analyse économique)
   solde_production: number;
   solde_apres_frais: number;
-  variation_nette: number;
+  // Variation trésorerie (inclut TVA)
+  variation_tresorerie: number;
   // Cumul
   cumul: number;
 }
@@ -36,11 +51,17 @@ DEFAULT_COEFFICIENTS[11] = 8.37; // December
 
 export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
   const { currentProject } = useProject();
+  const { settings } = useProjectSettings();
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['auto-cash-flow', currentProject?.id, mode, year],
+    queryKey: ['auto-cash-flow', currentProject?.id, mode, year, settings?.regime_tva],
     queryFn: async (): Promise<MonthlyCashFlowData[]> => {
       if (!currentProject?.id) return [];
+
+      // Check if franchise regime (no VAT)
+      const isFranchise = settings?.regime_tva === 'franchise_taxe';
+      const defaultTvaVente = settings?.tva_vente || 6;
+      const defaultTvaAchat = settings?.tva_achat || 21;
 
       // 1. Fetch seasonality coefficients for the mode
       const { data: coefData } = await supabase
@@ -68,7 +89,7 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
         .eq('year', year)
         .eq('mode', mode);
 
-      // 3. Fetch products and prices
+      // 3. Fetch products and prices with TVA rates
       const productIds = [...new Set((annualSales || []).map(s => s.product_id))];
       
       let products: any[] = [];
@@ -95,7 +116,7 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
         productPackaging = packagingRes.data || [];
         productVariableCosts = variableCostsRes.data || [];
 
-        // Fetch ingredient/packaging/variable cost details
+        // Fetch ingredient/packaging/variable cost details with TVA rates
         const ingredientIds = [...new Set(recipes.map(r => r.ingredient_id))];
         const packagingIds = [...new Set(productPackaging.map(pp => pp.packaging_id))];
         const variableCostIds = [...new Set(productVariableCosts.map(pvc => pvc.variable_cost_id))];
@@ -128,7 +149,7 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
         monthlySalesReel = reelData || [];
       }
 
-      // 5. Fetch professional expenses
+      // 5. Fetch professional expenses with TVA
       const expenseMode = mode === 'budget' ? 'simulation' : 'reel';
       const startOfYear = `${year}-01-01`;
       const endOfYear = `${year}-12-31`;
@@ -156,29 +177,56 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
         return prixBtc * 0.7 * 0.85;
       };
 
-      const getProductCosts = (productId: string): { matieres: number; emballages: number; variables: number } => {
-        // Raw materials cost
+      const getProductTvaRate = (productId: string): number => {
+        const product = products.find(p => p.id === productId);
+        return product?.tva_taux ?? defaultTvaVente;
+      };
+
+      const getProductCosts = (productId: string): { 
+        matieres_ht: number; 
+        emballages_ht: number; 
+        variables_ht: number;
+        tva_matieres: number;
+        tva_emballages: number;
+        tva_variables: number;
+      } => {
+        // Raw materials cost with TVA
         const productRecipes = recipes.filter(r => r.product_id === productId);
-        const matieres = productRecipes.reduce((sum, recipe) => {
+        let matieres_ht = 0;
+        let tva_matieres = 0;
+        productRecipes.forEach(recipe => {
           const ingredient = ingredients.find(i => i.id === recipe.ingredient_id);
-          return sum + (Number(recipe.quantite_utilisee) * Number(ingredient?.cout_unitaire || 0));
-        }, 0);
+          const ht = Number(recipe.quantite_utilisee) * Number(ingredient?.cout_unitaire || 0);
+          const tvaTaux = ingredient?.tva_taux ?? defaultTvaAchat;
+          matieres_ht += ht;
+          tva_matieres += isFranchise ? 0 : ht * (tvaTaux / 100);
+        });
 
-        // Packaging cost
+        // Packaging cost with TVA
         const productPacks = productPackaging.filter(pp => pp.product_id === productId);
-        const emballages = productPacks.reduce((sum, pack) => {
+        let emballages_ht = 0;
+        let tva_emballages = 0;
+        productPacks.forEach(pack => {
           const pkg = packaging.find(p => p.id === pack.packaging_id);
-          return sum + (Number(pack.quantite) * Number(pkg?.cout_unitaire || 0));
-        }, 0);
+          const ht = Number(pack.quantite) * Number(pkg?.cout_unitaire || 0);
+          const tvaTaux = pkg?.tva_taux ?? defaultTvaAchat;
+          emballages_ht += ht;
+          tva_emballages += isFranchise ? 0 : ht * (tvaTaux / 100);
+        });
 
-        // Variable costs
+        // Variable costs with TVA
         const productVarCosts = productVariableCosts.filter(pvc => pvc.product_id === productId);
-        const variables = productVarCosts.reduce((sum, pvc) => {
+        let variables_ht = 0;
+        let tva_variables = 0;
+        productVarCosts.forEach(pvc => {
           const vc = variableCosts.find(v => v.id === pvc.variable_cost_id);
-          return sum + (Number(pvc.quantite) * Number(vc?.cout_unitaire || 0));
-        }, 0);
+          const ht = Number(pvc.quantite) * Number(vc?.cout_unitaire || 0);
+          const tvaTaux = vc?.tva_taux ?? defaultTvaAchat;
+          variables_ht += ht;
+          tva_variables += isFranchise ? 0 : ht * (tvaTaux / 100);
+        });
 
-        return { matieres, emballages, variables };
+        return { matieres_ht, emballages_ht, variables_ht, tva_matieres, tva_emballages, tva_variables };
       };
 
       // 6. Calculate monthly data
@@ -190,10 +238,31 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
         const monthKey = `${year}-${(i + 1).toString().padStart(2, '0')}`;
         const coef = Number(coefficients[i]) / 100;
 
-        let encaissements = 0;
-        let achats_matieres = 0;
-        let achats_emballages = 0;
-        let couts_variables = 0;
+        let encaissements_ht = 0;
+        let tva_collectee = 0;
+        let achats_matieres_ht = 0;
+        let achats_emballages_ht = 0;
+        let couts_variables_ht = 0;
+        let tva_deductible_matieres = 0;
+        let tva_deductible_emballages = 0;
+        let tva_deductible_variables = 0;
+
+        const processSale = (productId: string, qty: number, prixOverride: number | null, categorie: string) => {
+          const prix = prixOverride ? Number(prixOverride) : getPrice(productId, categorie);
+          const ca_ht = qty * prix;
+          const tvaTaux = getProductTvaRate(productId);
+          
+          encaissements_ht += ca_ht;
+          tva_collectee += isFranchise ? 0 : ca_ht * (tvaTaux / 100);
+
+          const costs = getProductCosts(productId);
+          achats_matieres_ht += qty * costs.matieres_ht;
+          achats_emballages_ht += qty * costs.emballages_ht;
+          couts_variables_ht += qty * costs.variables_ht;
+          tva_deductible_matieres += qty * costs.tva_matieres;
+          tva_deductible_emballages += qty * costs.tva_emballages;
+          tva_deductible_variables += qty * costs.tva_variables;
+        };
 
         if (mode === 'reel') {
           // For real mode: use monthly_sales_reel if available
@@ -203,30 +272,14 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
             // Use actual monthly data
             monthReel.forEach(sale => {
               const qty = Number(sale.quantite) || 0;
-              const prix = sale.prix_ht_override 
-                ? Number(sale.prix_ht_override) 
-                : getPrice(sale.product_id, sale.categorie_prix);
-              encaissements += qty * prix;
-
-              const costs = getProductCosts(sale.product_id);
-              achats_matieres += qty * costs.matieres;
-              achats_emballages += qty * costs.emballages;
-              couts_variables += qty * costs.variables;
+              processSale(sale.product_id, qty, sale.prix_ht_override, sale.categorie_prix);
             });
           } else {
             // Fallback to annual_sales with seasonality
             (annualSales || []).forEach(sale => {
               const annualQty = Number(sale.quantite_annuelle) || 0;
               const monthQty = Math.round(annualQty * coef);
-              const prix = sale.prix_ht_override 
-                ? Number(sale.prix_ht_override) 
-                : getPrice(sale.product_id, sale.categorie_prix);
-              encaissements += monthQty * prix;
-
-              const costs = getProductCosts(sale.product_id);
-              achats_matieres += monthQty * costs.matieres;
-              achats_emballages += monthQty * costs.emballages;
-              couts_variables += monthQty * costs.variables;
+              processSale(sale.product_id, monthQty, sale.prix_ht_override, sale.categorie_prix);
             });
           }
         } else {
@@ -234,43 +287,63 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
           (annualSales || []).forEach(sale => {
             const annualQty = Number(sale.quantite_annuelle) || 0;
             const monthQty = Math.round(annualQty * coef);
-            const prix = sale.prix_ht_override 
-              ? Number(sale.prix_ht_override) 
-              : getPrice(sale.product_id, sale.categorie_prix);
-            encaissements += monthQty * prix;
-
-            const costs = getProductCosts(sale.product_id);
-            achats_matieres += monthQty * costs.matieres;
-            achats_emballages += monthQty * costs.emballages;
-            couts_variables += monthQty * costs.variables;
+            processSale(sale.product_id, monthQty, sale.prix_ht_override, sale.categorie_prix);
           });
         }
 
-        // Professional expenses for this month
-        const frais_professionnels = (expenses || [])
-          .filter(e => e.mois.startsWith(monthKey))
-          .reduce((sum, e) => sum + Number(e.montant_ht), 0);
+        // Professional expenses for this month with TVA
+        const monthExpenses = (expenses || []).filter(e => e.mois.startsWith(monthKey));
+        let frais_professionnels_ht = 0;
+        let tva_deductible_frais = 0;
+        monthExpenses.forEach(e => {
+          const ht = Number(e.montant_ht);
+          const tvaTaux = e.tva_taux ?? defaultTvaAchat;
+          frais_professionnels_ht += ht;
+          tva_deductible_frais += isFranchise ? 0 : ht * (tvaTaux / 100);
+        });
 
         // Calculate totals
-        const decaissements_production = achats_matieres + achats_emballages + couts_variables;
-        const solde_production = encaissements - decaissements_production;
-        const solde_apres_frais = solde_production - frais_professionnels;
-        const variation_nette = solde_apres_frais;
+        const decaissements_production_ht = achats_matieres_ht + achats_emballages_ht + couts_variables_ht;
+        const tva_deductible = tva_deductible_matieres + tva_deductible_emballages + tva_deductible_variables + tva_deductible_frais;
+        
+        // TVA
+        const encaissements_ttc = encaissements_ht + tva_collectee;
+        const decaissements_production_ttc = decaissements_production_ht + (tva_deductible_matieres + tva_deductible_emballages + tva_deductible_variables);
+        const frais_professionnels_ttc = frais_professionnels_ht + tva_deductible_frais;
+        const tva_nette = tva_collectee - tva_deductible;
 
-        cumul += variation_nette;
+        // Soldes économiques (HT) - inchangés
+        const solde_production = encaissements_ht - decaissements_production_ht;
+        const solde_apres_frais = solde_production - frais_professionnels_ht;
+
+        // Variation trésorerie (TTC - inclut la TVA)
+        // Encaissements TTC - Décaissements TTC - Frais TTC - TVA nette à payer
+        const variation_tresorerie = encaissements_ttc - decaissements_production_ttc - frais_professionnels_ttc - tva_nette;
+
+        cumul += variation_tresorerie;
 
         monthlyData.push({
           month: monthStr,
           monthLabel: MONTH_LABELS[i],
-          encaissements,
-          achats_matieres,
-          achats_emballages,
-          couts_variables,
-          decaissements_production,
-          frais_professionnels,
+          encaissements_ht,
+          tva_collectee,
+          encaissements_ttc,
+          achats_matieres_ht,
+          achats_emballages_ht,
+          couts_variables_ht,
+          decaissements_production_ht,
+          tva_deductible_matieres,
+          tva_deductible_emballages,
+          tva_deductible_variables,
+          tva_deductible_frais,
+          tva_deductible,
+          decaissements_production_ttc,
+          frais_professionnels_ht,
+          frais_professionnels_ttc,
+          tva_nette,
           solde_production,
           solde_apres_frais,
-          variation_nette,
+          variation_tresorerie,
           cumul,
         });
       }
@@ -282,10 +355,14 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
 
   // Calculate summary from data
   const summary = {
-    total_encaissements: data?.reduce((sum, m) => sum + m.encaissements, 0) || 0,
-    total_decaissements_production: data?.reduce((sum, m) => sum + m.decaissements_production, 0) || 0,
-    total_frais_professionnels: data?.reduce((sum, m) => sum + m.frais_professionnels, 0) || 0,
-    total_variation_nette: data?.reduce((sum, m) => sum + m.variation_nette, 0) || 0,
+    total_encaissements_ht: data?.reduce((sum, m) => sum + m.encaissements_ht, 0) || 0,
+    total_tva_collectee: data?.reduce((sum, m) => sum + m.tva_collectee, 0) || 0,
+    total_encaissements_ttc: data?.reduce((sum, m) => sum + m.encaissements_ttc, 0) || 0,
+    total_decaissements_production_ht: data?.reduce((sum, m) => sum + m.decaissements_production_ht, 0) || 0,
+    total_tva_deductible: data?.reduce((sum, m) => sum + m.tva_deductible, 0) || 0,
+    total_frais_professionnels_ht: data?.reduce((sum, m) => sum + m.frais_professionnels_ht, 0) || 0,
+    total_tva_nette: data?.reduce((sum, m) => sum + m.tva_nette, 0) || 0,
+    total_variation_tresorerie: data?.reduce((sum, m) => sum + m.variation_tresorerie, 0) || 0,
     solde_final: data?.[data.length - 1]?.cumul || 0,
     has_negative: data?.some(m => m.cumul < 0) || false,
     first_negative_month: data?.find(m => m.cumul < 0)?.monthLabel || null,
@@ -294,13 +371,21 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
   // Get current month data
   const currentMonthIndex = new Date().getMonth();
   const currentMonthData = data?.[currentMonthIndex] || {
-    encaissements: 0,
-    decaissements_production: 0,
-    frais_professionnels: 0,
+    encaissements_ht: 0,
+    tva_collectee: 0,
+    encaissements_ttc: 0,
+    decaissements_production_ht: 0,
+    tva_deductible: 0,
+    frais_professionnels_ht: 0,
+    tva_nette: 0,
     solde_production: 0,
     solde_apres_frais: 0,
+    variation_tresorerie: 0,
     cumul: 0,
   };
+
+  // Check if franchise regime
+  const isFranchise = settings?.regime_tva === 'franchise_taxe';
 
   return {
     monthlyData: data || [],
@@ -308,5 +393,6 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
     currentMonthData,
     isLoading,
     error,
+    isFranchise,
   };
 }

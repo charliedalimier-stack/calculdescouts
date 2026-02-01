@@ -3,6 +3,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Table,
   TableBody,
@@ -24,7 +25,7 @@ import {
   Bar,
   Legend,
 } from "recharts";
-import { Wallet, TrendingUp, TrendingDown, AlertTriangle, Receipt, Package, Boxes, Zap } from "lucide-react";
+import { Wallet, TrendingUp, TrendingDown, AlertTriangle, Receipt, Package, Boxes, Zap, FileText, Info } from "lucide-react";
 import { useAutoCashFlow, CashFlowMode } from "@/hooks/useAutoCashFlow";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { DEFINITIONS } from "@/lib/pedagogicDefinitions";
@@ -65,6 +66,7 @@ const CashFlow = () => {
     summary,
     currentMonthData,
     isLoading,
+    isFranchise,
   } = useAutoCashFlow({ mode: cashFlowMode, year: selectedYear });
 
   const handlePeriodChange = (params: { month?: number; year: number; mode: DataMode }) => {
@@ -93,7 +95,7 @@ const CashFlow = () => {
     );
   }
 
-  const hasData = summary.total_encaissements > 0 || summary.total_decaissements_production > 0;
+  const hasData = summary.total_encaissements_ht > 0 || summary.total_decaissements_production_ht > 0;
 
   return (
     <AppLayout
@@ -110,6 +112,15 @@ const CashFlow = () => {
           onChange={handlePeriodChange}
         />
       </div>
+
+      {/* TVA Info Alert */}
+      <Alert className="mb-6">
+        <Info className="h-4 w-4" />
+        <AlertDescription>
+          <strong>💡 La TVA est un flux de trésorerie, pas un revenu.</strong> Les calculs de CA HT, marge et résultat restent inchangés. 
+          {isFranchise && " (Régime franchise de taxe actif - aucune TVA n'est appliquée)"}
+        </AlertDescription>
+      </Alert>
 
       {/* Alert if negative */}
       {summary.has_negative && (
@@ -143,7 +154,7 @@ const CashFlow = () => {
         </Card>
       )}
 
-      {/* Summary Cards - Row 1: Current Month */}
+      {/* Summary Cards - Row 1: Current Month HT */}
       <div className="mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardContent className="p-6">
@@ -153,10 +164,13 @@ const CashFlow = () => {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  Encaissements (mois en cours)
+                  Encaissements HT (mois)
                   <InfoTooltip {...DEFINITIONS.encaissements} size="sm" />
                 </p>
-                <p className="text-xl font-bold">{formatCurrency(currentMonthData.encaissements)}</p>
+                <p className="text-xl font-bold">{formatCurrency(currentMonthData.encaissements_ht)}</p>
+                {!isFranchise && currentMonthData.tva_collectee > 0 && (
+                  <p className="text-xs text-muted-foreground">+ TVA: {formatCurrency(currentMonthData.tva_collectee)}</p>
+                )}
               </div>
             </div>
           </CardContent>
@@ -169,8 +183,11 @@ const CashFlow = () => {
                 <TrendingDown className="h-5 w-5 text-destructive" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Décaissements prod. (mois)</p>
-                <p className="text-xl font-bold">{formatCurrency(currentMonthData.decaissements_production)}</p>
+                <p className="text-sm text-muted-foreground">Décaissements prod. HT (mois)</p>
+                <p className="text-xl font-bold">{formatCurrency(currentMonthData.decaissements_production_ht)}</p>
+                {!isFranchise && currentMonthData.tva_deductible > 0 && (
+                  <p className="text-xs text-muted-foreground">TVA déd.: {formatCurrency(currentMonthData.tva_deductible)}</p>
+                )}
               </div>
             </div>
           </CardContent>
@@ -183,16 +200,40 @@ const CashFlow = () => {
                 <Receipt className="h-5 w-5 text-chart-5" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Frais professionnels (mois)</p>
-                <p className="text-xl font-bold">{formatCurrency(currentMonthData.frais_professionnels)}</p>
+                <p className="text-sm text-muted-foreground">Frais professionnels HT (mois)</p>
+                <p className="text-xl font-bold">{formatCurrency(currentMonthData.frais_professionnels_ht)}</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Summary Cards - Row 2: Soldes */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Summary Cards - Row 2: TVA + Soldes */}
+      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {!isFranchise && (
+          <Card className="border-chart-2/30 bg-chart-2/5">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-chart-2/10">
+                  <FileText className="h-5 w-5 text-chart-2" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    TVA nette (mois)
+                    <InfoTooltip {...DEFINITIONS.tva_nette} size="sm" />
+                  </p>
+                  <p className={`text-xl font-bold ${currentMonthData.tva_nette >= 0 ? "text-destructive" : "text-primary"}`}>
+                    {currentMonthData.tva_nette >= 0 ? `-${formatCurrency(currentMonthData.tva_nette)}` : `+${formatCurrency(Math.abs(currentMonthData.tva_nette))}`}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {currentMonthData.tva_nette >= 0 ? "À payer" : "À récupérer"}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -202,7 +243,7 @@ const CashFlow = () => {
                 <Wallet className={`h-5 w-5 ${currentMonthData.solde_production >= 0 ? "text-primary" : "text-destructive"}`} />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Solde production (mois)</p>
+                <p className="text-sm text-muted-foreground">Solde production (HT)</p>
                 <p className={`text-xl font-bold ${currentMonthData.solde_production >= 0 ? "text-primary" : "text-destructive"}`}>
                   {currentMonthData.solde_production >= 0 ? "+" : ""}{formatCurrency(currentMonthData.solde_production)}
                 </p>
@@ -220,7 +261,7 @@ const CashFlow = () => {
                 <Wallet className={`h-5 w-5 ${currentMonthData.solde_apres_frais >= 0 ? "text-primary" : "text-destructive"}`} />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Solde après frais (mois)</p>
+                <p className="text-sm text-muted-foreground">Solde après frais (HT)</p>
                 <p className={`text-xl font-bold ${currentMonthData.solde_apres_frais >= 0 ? "text-primary" : "text-destructive"}`}>
                   {currentMonthData.solde_apres_frais >= 0 ? "+" : ""}{formatCurrency(currentMonthData.solde_apres_frais)}
                 </p>
@@ -249,30 +290,46 @@ const CashFlow = () => {
       </div>
 
       {/* Annual Summary Cards */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">CA annuel</p>
-            <p className="text-lg font-semibold text-primary">{formatCurrency(summary.total_encaissements)}</p>
+            <p className="text-xs text-muted-foreground mb-1">CA annuel HT</p>
+            <p className="text-lg font-semibold text-primary">{formatCurrency(summary.total_encaissements_ht)}</p>
+            {!isFranchise && (
+              <p className="text-xs text-muted-foreground">TTC: {formatCurrency(summary.total_encaissements_ttc)}</p>
+            )}
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">Coûts production annuels</p>
-            <p className="text-lg font-semibold text-destructive">{formatCurrency(summary.total_decaissements_production)}</p>
+            <p className="text-xs text-muted-foreground mb-1">Coûts production HT</p>
+            <p className="text-lg font-semibold text-destructive">{formatCurrency(summary.total_decaissements_production_ht)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">Frais pro. annuels</p>
-            <p className="text-lg font-semibold">{formatCurrency(summary.total_frais_professionnels)}</p>
+            <p className="text-xs text-muted-foreground mb-1">Frais pro. HT</p>
+            <p className="text-lg font-semibold">{formatCurrency(summary.total_frais_professionnels_ht)}</p>
           </CardContent>
         </Card>
+        {!isFranchise && (
+          <Card className="border-chart-2/30">
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground mb-1">TVA nette annuelle</p>
+              <p className={`text-lg font-semibold ${summary.total_tva_nette >= 0 ? "text-destructive" : "text-primary"}`}>
+                {summary.total_tva_nette >= 0 ? `-${formatCurrency(summary.total_tva_nette)}` : `+${formatCurrency(Math.abs(summary.total_tva_nette))}`}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {summary.total_tva_nette >= 0 ? "À payer" : "À récupérer"}
+              </p>
+            </CardContent>
+          </Card>
+        )}
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">Variation nette annuelle</p>
-            <p className={`text-lg font-semibold ${summary.total_variation_nette >= 0 ? "text-primary" : "text-destructive"}`}>
-              {summary.total_variation_nette >= 0 ? "+" : ""}{formatCurrency(summary.total_variation_nette)}
+            <p className="text-xs text-muted-foreground mb-1">Variation trésorerie</p>
+            <p className={`text-lg font-semibold ${summary.total_variation_tresorerie >= 0 ? "text-primary" : "text-destructive"}`}>
+              {summary.total_variation_tresorerie >= 0 ? "+" : ""}{formatCurrency(summary.total_variation_tresorerie)}
             </p>
           </CardContent>
         </Card>
@@ -335,7 +392,7 @@ const CashFlow = () => {
         <Card className="mb-8">
           <CardHeader>
             <CardTitle className="text-base font-semibold">
-              Flux mensuels
+              Flux mensuels (HT)
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -359,9 +416,10 @@ const CashFlow = () => {
                     }}
                     formatter={(value: number, name: string) => {
                       const labels: Record<string, string> = {
-                        encaissements: "Encaissements",
-                        decaissements_production: "Décaissements prod.",
-                        frais_professionnels: "Frais professionnels",
+                        encaissements_ht: "Encaissements HT",
+                        decaissements_production_ht: "Décaissements prod. HT",
+                        frais_professionnels_ht: "Frais professionnels HT",
+                        tva_nette: "TVA nette",
                       };
                       return [formatCurrency(value), labels[name] || name];
                     }}
@@ -369,16 +427,18 @@ const CashFlow = () => {
                   <Legend 
                     formatter={(value) => {
                       const labels: Record<string, string> = {
-                        encaissements: "Encaissements",
-                        decaissements_production: "Décaissements prod.",
-                        frais_professionnels: "Frais professionnels",
+                        encaissements_ht: "Encaissements HT",
+                        decaissements_production_ht: "Décaissements prod. HT",
+                        frais_professionnels_ht: "Frais professionnels HT",
+                        tva_nette: "TVA nette",
                       };
                       return labels[value] || value;
                     }}
                   />
-                  <Bar dataKey="encaissements" fill="hsl(var(--chart-1))" />
-                  <Bar dataKey="decaissements_production" fill="hsl(var(--chart-4))" />
-                  <Bar dataKey="frais_professionnels" fill="hsl(var(--chart-5))" />
+                  <Bar dataKey="encaissements_ht" fill="hsl(var(--chart-1))" />
+                  <Bar dataKey="decaissements_production_ht" fill="hsl(var(--chart-4))" />
+                  <Bar dataKey="frais_professionnels_ht" fill="hsl(var(--chart-5))" />
+                  {!isFranchise && <Bar dataKey="tva_nette" fill="hsl(var(--chart-2))" />}
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -406,9 +466,12 @@ const CashFlow = () => {
                   <TableHead>Mois</TableHead>
                   <TableHead className="text-right">
                     <span className="flex items-center justify-end gap-1">
-                      <TrendingUp className="h-4 w-4" /> Encaissements
+                      <TrendingUp className="h-4 w-4" /> CA HT
                     </span>
                   </TableHead>
+                  {!isFranchise && (
+                    <TableHead className="text-right text-chart-2">TVA coll.</TableHead>
+                  )}
                   <TableHead className="text-right">
                     <span className="flex items-center justify-end gap-1">
                       <Package className="h-4 w-4" /> Matières
@@ -416,20 +479,26 @@ const CashFlow = () => {
                   </TableHead>
                   <TableHead className="text-right">
                     <span className="flex items-center justify-end gap-1">
-                      <Boxes className="h-4 w-4" /> Emballages
+                      <Boxes className="h-4 w-4" /> Emball.
                     </span>
                   </TableHead>
                   <TableHead className="text-right">
                     <span className="flex items-center justify-end gap-1">
-                      <Zap className="h-4 w-4" /> Var. prod.
+                      <Zap className="h-4 w-4" /> Var.
                     </span>
                   </TableHead>
                   <TableHead className="text-right">
                     <span className="flex items-center justify-end gap-1">
-                      <Receipt className="h-4 w-4" /> Frais pro.
+                      <Receipt className="h-4 w-4" /> Frais
                     </span>
                   </TableHead>
-                  <TableHead className="text-right">Solde net</TableHead>
+                  {!isFranchise && (
+                    <>
+                      <TableHead className="text-right text-chart-2">TVA déd.</TableHead>
+                      <TableHead className="text-right text-chart-2">TVA nette</TableHead>
+                    </>
+                  )}
+                  <TableHead className="text-right">Var. trés.</TableHead>
                   <TableHead className="text-right">Cumul</TableHead>
                 </TableRow>
               </TableHeader>
@@ -438,22 +507,37 @@ const CashFlow = () => {
                   <TableRow key={row.month}>
                     <TableCell className="font-medium">{row.monthLabel}</TableCell>
                     <TableCell className="text-right text-primary">
-                      {formatCurrency(row.encaissements)}
+                      {formatCurrency(row.encaissements_ht)}
+                    </TableCell>
+                    {!isFranchise && (
+                      <TableCell className="text-right text-chart-2">
+                        {row.tva_collectee > 0 ? formatCurrency(row.tva_collectee) : '-'}
+                      </TableCell>
+                    )}
+                    <TableCell className="text-right text-destructive">
+                      {row.achats_matieres_ht > 0 ? `-${formatCurrency(row.achats_matieres_ht)}` : '-'}
                     </TableCell>
                     <TableCell className="text-right text-destructive">
-                      {row.achats_matieres > 0 ? `-${formatCurrency(row.achats_matieres)}` : '-'}
+                      {row.achats_emballages_ht > 0 ? `-${formatCurrency(row.achats_emballages_ht)}` : '-'}
                     </TableCell>
                     <TableCell className="text-right text-destructive">
-                      {row.achats_emballages > 0 ? `-${formatCurrency(row.achats_emballages)}` : '-'}
-                    </TableCell>
-                    <TableCell className="text-right text-destructive">
-                      {row.couts_variables > 0 ? `-${formatCurrency(row.couts_variables)}` : '-'}
+                      {row.couts_variables_ht > 0 ? `-${formatCurrency(row.couts_variables_ht)}` : '-'}
                     </TableCell>
                     <TableCell className="text-right text-chart-5">
-                      {row.frais_professionnels > 0 ? `-${formatCurrency(row.frais_professionnels)}` : '-'}
+                      {row.frais_professionnels_ht > 0 ? `-${formatCurrency(row.frais_professionnels_ht)}` : '-'}
                     </TableCell>
+                    {!isFranchise && (
+                      <>
+                        <TableCell className="text-right text-chart-2">
+                          {row.tva_deductible > 0 ? formatCurrency(row.tva_deductible) : '-'}
+                        </TableCell>
+                        <TableCell className={`text-right font-medium ${row.tva_nette >= 0 ? "text-destructive" : "text-primary"}`}>
+                          {row.tva_nette !== 0 ? (row.tva_nette >= 0 ? `-${formatCurrency(row.tva_nette)}` : `+${formatCurrency(Math.abs(row.tva_nette))}`) : '-'}
+                        </TableCell>
+                      </>
+                    )}
                     <TableCell className="text-right">
-                      {getSoldeBadge(row.variation_nette)}
+                      {getSoldeBadge(row.variation_tresorerie)}
                     </TableCell>
                     <TableCell className="text-right font-semibold">
                       <span className={row.cumul < 0 ? "text-destructive" : ""}>
@@ -466,22 +550,37 @@ const CashFlow = () => {
                 <TableRow className="bg-muted/50 font-semibold">
                   <TableCell>Total annuel</TableCell>
                   <TableCell className="text-right text-primary">
-                    {formatCurrency(summary.total_encaissements)}
+                    {formatCurrency(summary.total_encaissements_ht)}
+                  </TableCell>
+                  {!isFranchise && (
+                    <TableCell className="text-right text-chart-2">
+                      {formatCurrency(summary.total_tva_collectee)}
+                    </TableCell>
+                  )}
+                  <TableCell className="text-right text-destructive">
+                    -{formatCurrency(monthlyData.reduce((sum, m) => sum + m.achats_matieres_ht, 0))}
                   </TableCell>
                   <TableCell className="text-right text-destructive">
-                    -{formatCurrency(monthlyData.reduce((sum, m) => sum + m.achats_matieres, 0))}
+                    -{formatCurrency(monthlyData.reduce((sum, m) => sum + m.achats_emballages_ht, 0))}
                   </TableCell>
                   <TableCell className="text-right text-destructive">
-                    -{formatCurrency(monthlyData.reduce((sum, m) => sum + m.achats_emballages, 0))}
-                  </TableCell>
-                  <TableCell className="text-right text-destructive">
-                    -{formatCurrency(monthlyData.reduce((sum, m) => sum + m.couts_variables, 0))}
+                    -{formatCurrency(monthlyData.reduce((sum, m) => sum + m.couts_variables_ht, 0))}
                   </TableCell>
                   <TableCell className="text-right text-chart-5">
-                    -{formatCurrency(summary.total_frais_professionnels)}
+                    -{formatCurrency(summary.total_frais_professionnels_ht)}
                   </TableCell>
+                  {!isFranchise && (
+                    <>
+                      <TableCell className="text-right text-chart-2">
+                        {formatCurrency(summary.total_tva_deductible)}
+                      </TableCell>
+                      <TableCell className={`text-right font-medium ${summary.total_tva_nette >= 0 ? "text-destructive" : "text-primary"}`}>
+                        {summary.total_tva_nette >= 0 ? `-${formatCurrency(summary.total_tva_nette)}` : `+${formatCurrency(Math.abs(summary.total_tva_nette))}`}
+                      </TableCell>
+                    </>
+                  )}
                   <TableCell className="text-right">
-                    {getSoldeBadge(summary.total_variation_nette)}
+                    {getSoldeBadge(summary.total_variation_tresorerie)}
                   </TableCell>
                   <TableCell className="text-right">
                     <span className={summary.solde_final < 0 ? "text-destructive" : ""}>

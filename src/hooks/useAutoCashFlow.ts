@@ -8,7 +8,13 @@ export type CashFlowMode = 'budget' | 'reel';
 export interface MonthlyCashFlowData {
   month: string;
   monthLabel: string;
-  // Encaissements (Revenue HT)
+  // CA HT recognized at sale date (for reference - not cash)
+  ca_ht_periode: number;
+  // Encaissements by channel (after payment delay)
+  encaissements_btc: number;
+  encaissements_btb: number;
+  encaissements_distributeur: number;
+  // Encaissements (Revenue HT after payment delay)
   encaissements_ht: number;
   // TVA
   tva_collectee: number;
@@ -49,12 +55,19 @@ const MONTH_LABELS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Ju
 const DEFAULT_COEFFICIENTS = Array(12).fill(8.33);
 DEFAULT_COEFFICIENTS[11] = 8.37; // December
 
+// Helper to calculate target month index based on delay
+function getTargetMonthIndex(saleMonthIndex: number, delayDays: number): number {
+  // Each month = 30 days for simplicity
+  const delayMonths = Math.floor(delayDays / 30);
+  return saleMonthIndex + delayMonths;
+}
+
 export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
   const { currentProject } = useProject();
   const { settings } = useProjectSettings();
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['auto-cash-flow', currentProject?.id, mode, year, settings?.regime_tva],
+    queryKey: ['auto-cash-flow', currentProject?.id, mode, year, settings?.regime_tva, settings?.delai_paiement_btc, settings?.delai_paiement_btb, settings?.delai_paiement_distributeur],
     queryFn: async (): Promise<MonthlyCashFlowData[]> => {
       if (!currentProject?.id) return [];
 
@@ -62,6 +75,11 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
       const isFranchise = settings?.regime_tva === 'franchise_taxe';
       const defaultTvaVente = settings?.tva_vente || 6;
       const defaultTvaAchat = settings?.tva_achat || 21;
+      
+      // Payment delays per channel
+      const delayBtc = (settings as any)?.delai_paiement_btc ?? 0;
+      const delayBtb = (settings as any)?.delai_paiement_btb ?? 30;
+      const delayDistributeur = (settings as any)?.delai_paiement_distributeur ?? 30;
 
       // 1. Fetch seasonality coefficients for the mode
       const { data: coefData } = await supabase
@@ -182,6 +200,12 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
         return product?.tva_taux ?? defaultTvaVente;
       };
 
+      const getDelayForChannel = (channel: string): number => {
+        if (channel === 'BTC') return delayBtc;
+        if (channel === 'BTB') return delayBtb;
+        return delayDistributeur;
+      };
+
       const getProductCosts = (productId: string): { 
         matieres_ht: number; 
         emballages_ht: number; 
@@ -229,57 +253,97 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
         return { matieres_ht, emballages_ht, variables_ht, tva_matieres, tva_emballages, tva_variables };
       };
 
-      // 6. Calculate monthly data
-      const monthlyData: MonthlyCashFlowData[] = [];
-      let cumul = 0;
+      // 6. Initialize monthly data structures
+      // We need 24 months to handle year-end delays (current year + next year spillover)
+      const encaissementsByMonth: Array<{
+        btc_ht: number;
+        btb_ht: number;
+        distributeur_ht: number;
+        btc_tva: number;
+        btb_tva: number;
+        distributeur_tva: number;
+      }> = Array(24).fill(null).map(() => ({
+        btc_ht: 0, btb_ht: 0, distributeur_ht: 0,
+        btc_tva: 0, btb_tva: 0, distributeur_tva: 0,
+      }));
 
+      const caByMonth: number[] = Array(12).fill(0);
+      const costsByMonth: Array<{
+        achats_matieres_ht: number;
+        achats_emballages_ht: number;
+        couts_variables_ht: number;
+        tva_deductible_matieres: number;
+        tva_deductible_emballages: number;
+        tva_deductible_variables: number;
+      }> = Array(12).fill(null).map(() => ({
+        achats_matieres_ht: 0, achats_emballages_ht: 0, couts_variables_ht: 0,
+        tva_deductible_matieres: 0, tva_deductible_emballages: 0, tva_deductible_variables: 0,
+      }));
+
+      // Process sales by month
+      const processSale = (
+        saleMonthIndex: number,
+        productId: string, 
+        qty: number, 
+        prixOverride: number | null, 
+        categorie: string
+      ) => {
+        const prix = prixOverride ? Number(prixOverride) : getPrice(productId, categorie);
+        const ca_ht = qty * prix;
+        const tvaTaux = getProductTvaRate(productId);
+        const tva = isFranchise ? 0 : ca_ht * (tvaTaux / 100);
+
+        // CA is recognized at sale date
+        caByMonth[saleMonthIndex] += ca_ht;
+
+        // Encaissements are received after delay
+        const delay = getDelayForChannel(categorie);
+        const targetMonthIndex = getTargetMonthIndex(saleMonthIndex, delay);
+        
+        // Only count if within our 24-month window
+        if (targetMonthIndex < 24) {
+          if (categorie === 'BTC') {
+            encaissementsByMonth[targetMonthIndex].btc_ht += ca_ht;
+            encaissementsByMonth[targetMonthIndex].btc_tva += tva;
+          } else if (categorie === 'BTB') {
+            encaissementsByMonth[targetMonthIndex].btb_ht += ca_ht;
+            encaissementsByMonth[targetMonthIndex].btb_tva += tva;
+          } else {
+            encaissementsByMonth[targetMonthIndex].distributeur_ht += ca_ht;
+            encaissementsByMonth[targetMonthIndex].distributeur_tva += tva;
+          }
+        }
+
+        // Production costs are incurred at sale date (we produce when we sell)
+        const costs = getProductCosts(productId);
+        costsByMonth[saleMonthIndex].achats_matieres_ht += qty * costs.matieres_ht;
+        costsByMonth[saleMonthIndex].achats_emballages_ht += qty * costs.emballages_ht;
+        costsByMonth[saleMonthIndex].couts_variables_ht += qty * costs.variables_ht;
+        costsByMonth[saleMonthIndex].tva_deductible_matieres += qty * costs.tva_matieres;
+        costsByMonth[saleMonthIndex].tva_deductible_emballages += qty * costs.tva_emballages;
+        costsByMonth[saleMonthIndex].tva_deductible_variables += qty * costs.tva_variables;
+      };
+
+      // Process all sales
       for (let i = 0; i < 12; i++) {
         const monthStr = `${year}-${(i + 1).toString().padStart(2, '0')}-01`;
-        const monthKey = `${year}-${(i + 1).toString().padStart(2, '0')}`;
         const coef = Number(coefficients[i]) / 100;
-
-        let encaissements_ht = 0;
-        let tva_collectee = 0;
-        let achats_matieres_ht = 0;
-        let achats_emballages_ht = 0;
-        let couts_variables_ht = 0;
-        let tva_deductible_matieres = 0;
-        let tva_deductible_emballages = 0;
-        let tva_deductible_variables = 0;
-
-        const processSale = (productId: string, qty: number, prixOverride: number | null, categorie: string) => {
-          const prix = prixOverride ? Number(prixOverride) : getPrice(productId, categorie);
-          const ca_ht = qty * prix;
-          const tvaTaux = getProductTvaRate(productId);
-          
-          encaissements_ht += ca_ht;
-          tva_collectee += isFranchise ? 0 : ca_ht * (tvaTaux / 100);
-
-          const costs = getProductCosts(productId);
-          achats_matieres_ht += qty * costs.matieres_ht;
-          achats_emballages_ht += qty * costs.emballages_ht;
-          couts_variables_ht += qty * costs.variables_ht;
-          tva_deductible_matieres += qty * costs.tva_matieres;
-          tva_deductible_emballages += qty * costs.tva_emballages;
-          tva_deductible_variables += qty * costs.tva_variables;
-        };
 
         if (mode === 'reel') {
           // For real mode: use monthly_sales_reel if available
           const monthReel = monthlySalesReel.filter(s => s.month === monthStr);
           
           if (monthReel.length > 0) {
-            // Use actual monthly data
             monthReel.forEach(sale => {
               const qty = Number(sale.quantite) || 0;
-              processSale(sale.product_id, qty, sale.prix_ht_override, sale.categorie_prix);
+              processSale(i, sale.product_id, qty, sale.prix_ht_override, sale.categorie_prix);
             });
           } else {
             // Fallback to annual_sales with seasonality
             (annualSales || []).forEach(sale => {
               const annualQty = Number(sale.quantite_annuelle) || 0;
               const monthQty = Math.round(annualQty * coef);
-              processSale(sale.product_id, monthQty, sale.prix_ht_override, sale.categorie_prix);
+              processSale(i, sale.product_id, monthQty, sale.prix_ht_override, sale.categorie_prix);
             });
           }
         } else {
@@ -287,9 +351,38 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
           (annualSales || []).forEach(sale => {
             const annualQty = Number(sale.quantite_annuelle) || 0;
             const monthQty = Math.round(annualQty * coef);
-            processSale(sale.product_id, monthQty, sale.prix_ht_override, sale.categorie_prix);
+            processSale(i, sale.product_id, monthQty, sale.prix_ht_override, sale.categorie_prix);
           });
         }
+      }
+
+      // 7. Calculate monthly data with cumulative
+      const monthlyData: MonthlyCashFlowData[] = [];
+      let cumul = 0;
+
+      for (let i = 0; i < 12; i++) {
+        const monthStr = `${year}-${(i + 1).toString().padStart(2, '0')}-01`;
+        const monthKey = `${year}-${(i + 1).toString().padStart(2, '0')}`;
+
+        // Encaissements for this month (includes delayed payments)
+        const enc = encaissementsByMonth[i];
+        const encaissements_btc = enc.btc_ht;
+        const encaissements_btb = enc.btb_ht;
+        const encaissements_distributeur = enc.distributeur_ht;
+        const encaissements_ht = encaissements_btc + encaissements_btb + encaissements_distributeur;
+        const tva_collectee = enc.btc_tva + enc.btb_tva + enc.distributeur_tva;
+
+        // CA recognized this period (for reference)
+        const ca_ht_periode = caByMonth[i];
+
+        // Production costs for this month
+        const costs = costsByMonth[i];
+        const achats_matieres_ht = costs.achats_matieres_ht;
+        const achats_emballages_ht = costs.achats_emballages_ht;
+        const couts_variables_ht = costs.couts_variables_ht;
+        const tva_deductible_matieres = costs.tva_deductible_matieres;
+        const tva_deductible_emballages = costs.tva_deductible_emballages;
+        const tva_deductible_variables = costs.tva_deductible_variables;
 
         // Professional expenses for this month with TVA
         const monthExpenses = (expenses || []).filter(e => e.mois.startsWith(monthKey));
@@ -312,12 +405,11 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
         const frais_professionnels_ttc = frais_professionnels_ht + tva_deductible_frais;
         const tva_nette = tva_collectee - tva_deductible;
 
-        // Soldes économiques (HT) - inchangés
+        // Soldes économiques (HT) - based on encaissements (cash), not CA
         const solde_production = encaissements_ht - decaissements_production_ht;
         const solde_apres_frais = solde_production - frais_professionnels_ht;
 
         // Variation trésorerie (TTC - inclut la TVA)
-        // Encaissements TTC - Décaissements TTC - Frais TTC - TVA nette à payer
         const variation_tresorerie = encaissements_ttc - decaissements_production_ttc - frais_professionnels_ttc - tva_nette;
 
         cumul += variation_tresorerie;
@@ -325,6 +417,10 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
         monthlyData.push({
           month: monthStr,
           monthLabel: MONTH_LABELS[i],
+          ca_ht_periode,
+          encaissements_btc,
+          encaissements_btb,
+          encaissements_distributeur,
           encaissements_ht,
           tva_collectee,
           encaissements_ttc,
@@ -355,7 +451,11 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
 
   // Calculate summary from data
   const summary = {
+    total_ca_ht: data?.reduce((sum, m) => sum + m.ca_ht_periode, 0) || 0,
     total_encaissements_ht: data?.reduce((sum, m) => sum + m.encaissements_ht, 0) || 0,
+    total_encaissements_btc: data?.reduce((sum, m) => sum + m.encaissements_btc, 0) || 0,
+    total_encaissements_btb: data?.reduce((sum, m) => sum + m.encaissements_btb, 0) || 0,
+    total_encaissements_distributeur: data?.reduce((sum, m) => sum + m.encaissements_distributeur, 0) || 0,
     total_tva_collectee: data?.reduce((sum, m) => sum + m.tva_collectee, 0) || 0,
     total_encaissements_ttc: data?.reduce((sum, m) => sum + m.encaissements_ttc, 0) || 0,
     total_decaissements_production_ht: data?.reduce((sum, m) => sum + m.decaissements_production_ht, 0) || 0,
@@ -371,6 +471,10 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
   // Get current month data
   const currentMonthIndex = new Date().getMonth();
   const currentMonthData = data?.[currentMonthIndex] || {
+    ca_ht_periode: 0,
+    encaissements_btc: 0,
+    encaissements_btb: 0,
+    encaissements_distributeur: 0,
     encaissements_ht: 0,
     tva_collectee: 0,
     encaissements_ttc: 0,
@@ -387,6 +491,13 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
   // Check if franchise regime
   const isFranchise = settings?.regime_tva === 'franchise_taxe';
 
+  // Payment delays info
+  const paymentDelays = {
+    btc: (settings as any)?.delai_paiement_btc ?? 0,
+    btb: (settings as any)?.delai_paiement_btb ?? 30,
+    distributeur: (settings as any)?.delai_paiement_distributeur ?? 30,
+  };
+
   return {
     monthlyData: data || [],
     summary,
@@ -394,5 +505,6 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
     isLoading,
     error,
     isFranchise,
+    paymentDelays,
   };
 }

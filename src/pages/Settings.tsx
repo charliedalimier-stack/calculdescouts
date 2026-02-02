@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useProjectSettings } from "@/hooks/useProjectSettings";
 import { useProject } from "@/contexts/ProjectContext";
-import { Percent, Timer, TrendingUp } from "lucide-react";
+import { Percent, TrendingUp } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FiscalSettingsCard } from "@/components/settings/FiscalSettingsCard";
 import { TVASettingsCard, VATRegime, VATPeriodicite } from "@/components/settings/TVASettingsCard";
+import { PaymentDelaysCard } from "@/components/settings/PaymentDelaysCard";
 
 const SettingsPage = () => {
   const { currentProject } = useProject();
@@ -33,6 +34,9 @@ const SettingsPage = () => {
     seuil_stock_alerte: 10,
     delai_paiement_client: 30,
     delai_paiement_fournisseur: 30,
+    delai_paiement_btc: 0,
+    delai_paiement_btb: 30,
+    delai_paiement_distributeur: 30,
     taux_cotisations_sociales: 20.5,
     annee_fiscale_reference: 2026,
     taux_communal: 7.0,
@@ -60,6 +64,9 @@ const SettingsPage = () => {
         seuil_stock_alerte: settings.seuil_stock_alerte,
         delai_paiement_client: settings.delai_paiement_client,
         delai_paiement_fournisseur: settings.delai_paiement_fournisseur,
+        delai_paiement_btc: (settings as any).delai_paiement_btc ?? 0,
+        delai_paiement_btb: (settings as any).delai_paiement_btb ?? 30,
+        delai_paiement_distributeur: (settings as any).delai_paiement_distributeur ?? 30,
         taux_cotisations_sociales: settings.taux_cotisations_sociales,
         annee_fiscale_reference: settings.annee_fiscale_reference,
         taux_communal: settings.taux_communal,
@@ -229,56 +236,11 @@ const SettingsPage = () => {
           onChange={handleChange}
         />
 
-        {/* Délais et alertes */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Timer className="h-5 w-5 text-primary" />
-              Délais et alertes
-            </CardTitle>
-            <CardDescription>
-              Configurez les délais de paiement et seuils d'alerte
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="delai_paiement_client">Délai client (jours)</Label>
-                <Input
-                  id="delai_paiement_client"
-                  type="number"
-                  step="1"
-                  value={formData.delai_paiement_client}
-                  onChange={(e) => handleChange('delai_paiement_client', e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="delai_paiement_fournisseur">Délai fournisseur (jours)</Label>
-                <Input
-                  id="delai_paiement_fournisseur"
-                  type="number"
-                  step="1"
-                  value={formData.delai_paiement_fournisseur}
-                  onChange={(e) => handleChange('delai_paiement_fournisseur', e.target.value)}
-                />
-              </div>
-            </div>
-            <Separator />
-            <div className="space-y-2">
-              <Label htmlFor="seuil_stock_alerte">Seuil alerte stock</Label>
-              <Input
-                id="seuil_stock_alerte"
-                type="number"
-                step="1"
-                value={formData.seuil_stock_alerte}
-                onChange={(e) => handleChange('seuil_stock_alerte', e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Quantité minimum avant alerte de réapprovisionnement
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Délais de paiement */}
+        <PaymentDelaysCard 
+          formData={formData}
+          onChange={handleChange}
+        />
 
         {/* Paramètres fiscaux */}
         <FiscalSettingsCard 

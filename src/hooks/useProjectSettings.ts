@@ -33,6 +33,10 @@ export interface ProjectSettings {
   nombre_enfants_charge: number;
   quotite_exemptee_base: number;
   majoration_par_enfant: number;
+  // Payment delays per channel
+  delai_paiement_btc: number;
+  delai_paiement_btb: number;
+  delai_paiement_distributeur: number;
   created_at: string;
   updated_at: string;
 }
@@ -70,6 +74,10 @@ const defaultSettings: Omit<ProjectSettings, 'id' | 'project_id' | 'created_at' 
   nombre_enfants_charge: 0,
   quotite_exemptee_base: 10570,
   majoration_par_enfant: 1850,
+  // Payment delays per channel
+  delai_paiement_btc: 0,
+  delai_paiement_btb: 30,
+  delai_paiement_distributeur: 30,
 };
 
 export function useProjectSettings() {

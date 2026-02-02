@@ -782,7 +782,10 @@ export type Database = {
           coefficient_cible: number
           coefficient_min: number
           created_at: string
+          delai_paiement_btb: number
+          delai_paiement_btc: number
           delai_paiement_client: number
+          delai_paiement_distributeur: number
           delai_paiement_fournisseur: number
           id: string
           majoration_par_enfant: number
@@ -811,7 +814,10 @@ export type Database = {
           coefficient_cible?: number
           coefficient_min?: number
           created_at?: string
+          delai_paiement_btb?: number
+          delai_paiement_btc?: number
           delai_paiement_client?: number
+          delai_paiement_distributeur?: number
           delai_paiement_fournisseur?: number
           id?: string
           majoration_par_enfant?: number
@@ -840,7 +846,10 @@ export type Database = {
           coefficient_cible?: number
           coefficient_min?: number
           created_at?: string
+          delai_paiement_btb?: number
+          delai_paiement_btc?: number
           delai_paiement_client?: number
+          delai_paiement_distributeur?: number
           delai_paiement_fournisseur?: number
           id?: string
           majoration_par_enfant?: number

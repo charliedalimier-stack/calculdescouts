@@ -52,131 +52,251 @@ export interface StockReportData {
 
 type ReportMode = 'budget' | 'reel';
 
-// Map 'budget' to database mode values
-const mapModeForProducts = (mode: ReportMode) => mode === 'budget' ? 'simulation' : 'reel';
-const mapModeForSales = (mode: ReportMode) => mode; // sales_targets use 'budget', sales_actuals use 'reel'
+const MONTH_LABELS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
 
+const DEFAULT_COEFFICIENTS = [8.33, 8.33, 8.33, 8.33, 8.33, 8.33, 8.33, 8.33, 8.33, 8.33, 8.33, 8.37];
+
+/**
+ * Financial Report Hook
+ * Uses annual_sales + seasonality_coefficients as the single source of truth
+ * Same data source as useAutoCashFlow and useMonthlyDistribution
+ */
 export const useFinancialReport = (year: number, mode: ReportMode = 'budget') => {
   const { currentProject } = useProject();
-  const dbMode = mapModeForProducts(mode);
 
   return useQuery({
     queryKey: ['financial-report', currentProject?.id, mode, year],
     queryFn: async (): Promise<FinancialReportData[]> => {
       if (!currentProject?.id) return [];
 
-      const startDate = `${year}-01-01`;
-      const endDate = `${year}-12-31`;
+      // DEBUG: Log parameters
+      console.log('[useFinancialReport] year:', year, 'mode:', mode);
 
-      // Fetch products
-      const { data: products } = await supabase
-        .from('products')
-        .select('id, nom_produit')
+      // 1. Fetch seasonality coefficients for the mode
+      const { data: coefData } = await supabase
+        .from('seasonality_coefficients')
+        .select('*')
         .eq('project_id', currentProject.id)
-        .eq('mode', dbMode);
+        .eq('year', year)
+        .eq('mode', mode)
+        .maybeSingle();
 
-      // For financial report, use annual_sales first then calculate monthly distribution
-      // Or use sales_targets for budget, sales_actuals for reel
-      const salesTable = mode === 'reel' ? 'sales_actuals' : 'sales_targets';
-      const quantityField = mode === 'reel' ? 'quantite_reelle' : 'quantite_objectif';
+      const coefficients = coefData
+        ? [
+            Number(coefData.month_01), Number(coefData.month_02), Number(coefData.month_03),
+            Number(coefData.month_04), Number(coefData.month_05), Number(coefData.month_06),
+            Number(coefData.month_07), Number(coefData.month_08), Number(coefData.month_09),
+            Number(coefData.month_10), Number(coefData.month_11), Number(coefData.month_12),
+          ]
+        : DEFAULT_COEFFICIENTS;
+
+      // 2. Fetch annual sales for the mode (SINGLE SOURCE OF TRUTH)
+      const { data: annualSales } = await supabase
+        .from('annual_sales')
+        .select('*')
+        .eq('project_id', currentProject.id)
+        .eq('year', year)
+        .eq('mode', mode);
+
+      console.log('[useFinancialReport] annualSales count:', annualSales?.length || 0);
+
+      // 3. Collect product IDs and fetch related data
+      const productIds = [...new Set((annualSales || []).map(s => s.product_id))];
       
-      const { data: sales } = await supabase
-        .from(salesTable)
-        .select('*')
-        .eq('project_id', currentProject.id)
-        .gte('mois', startDate)
-        .lte('mois', endDate);
+      let products: any[] = [];
+      let productPrices: any[] = [];
+      let recipes: any[] = [];
+      let productPackaging: any[] = [];
+      let productVariableCosts: any[] = [];
+      let ingredients: any[] = [];
+      let packaging: any[] = [];
+      let variableCosts: any[] = [];
 
-      // Fetch prices
-      const { data: prices } = await supabase
-        .from('product_prices')
-        .select('*')
-        .eq('mode', dbMode);
+      if (productIds.length > 0) {
+        const [productsRes, pricesRes, recipesRes, packagingRes, variableCostsRes] = await Promise.all([
+          supabase.from('products').select('*').in('id', productIds),
+          supabase.from('product_prices').select('*').in('product_id', productIds).eq('mode', 'simulation'),
+          supabase.from('recipes').select('*').in('product_id', productIds).eq('mode', 'simulation'),
+          supabase.from('product_packaging').select('*').in('product_id', productIds).eq('mode', 'simulation'),
+          supabase.from('product_variable_costs').select('*').in('product_id', productIds).eq('mode', 'simulation'),
+        ]);
 
-      // Fetch expenses
+        products = productsRes.data || [];
+        productPrices = pricesRes.data || [];
+        recipes = recipesRes.data || [];
+        productPackaging = packagingRes.data || [];
+        productVariableCosts = variableCostsRes.data || [];
+
+        // Fetch ingredient/packaging/variable cost details
+        const ingredientIds = [...new Set(recipes.map(r => r.ingredient_id))];
+        const packagingIds = [...new Set(productPackaging.map(pp => pp.packaging_id))];
+        const variableCostIds = [...new Set(productVariableCosts.map(pvc => pvc.variable_cost_id))];
+
+        const [ingredientsRes, packagingDetailsRes, variableCostsDetailsRes] = await Promise.all([
+          ingredientIds.length > 0 
+            ? supabase.from('ingredients').select('*').in('id', ingredientIds) 
+            : Promise.resolve({ data: [] }),
+          packagingIds.length > 0 
+            ? supabase.from('packaging').select('*').in('id', packagingIds) 
+            : Promise.resolve({ data: [] }),
+          variableCostIds.length > 0 
+            ? supabase.from('variable_costs').select('*').in('id', variableCostIds) 
+            : Promise.resolve({ data: [] }),
+        ]);
+
+        ingredients = ingredientsRes.data || [];
+        packaging = packagingDetailsRes.data || [];
+        variableCosts = variableCostsDetailsRes.data || [];
+      }
+
+      // 4. Fetch professional expenses
+      const expenseMode = mode === 'budget' ? 'simulation' : 'reel';
+      const startOfYear = `${year}-01-01`;
+      const endOfYear = `${year}-12-31`;
+      
       const { data: expenses } = await supabase
         .from('professional_expenses')
         .select('*')
         .eq('project_id', currentProject.id)
-        .eq('mode', dbMode)
-        .gte('mois', startDate)
-        .lte('mois', endDate);
+        .eq('mode', expenseMode)
+        .gte('mois', startOfYear)
+        .lte('mois', endOfYear);
 
-      // Fetch recipes for cost calculation
-      const { data: recipes } = await supabase
-        .from('recipes')
-        .select('*, ingredients(*)')
-        .eq('mode', dbMode);
+      console.log('[useFinancialReport] expenses count:', expenses?.length || 0);
 
-      // Fetch packaging
-      const { data: productPackaging } = await supabase
-        .from('product_packaging')
-        .select('*, packaging(*)')
-        .eq('mode', dbMode);
-
-      // Calculate monthly data
-      const monthlyData: FinancialReportData[] = [];
-      
-      for (let month = 1; month <= 12; month++) {
-        const monthStr = `${year}-${month.toString().padStart(2, '0')}`;
-        const monthStart = `${monthStr}-01`;
+      // Helper functions
+      const getPrice = (productId: string, category: string): number => {
+        const price = productPrices.find(
+          p => p.product_id === productId && p.categorie_prix === category
+        );
+        if (price) return Number(price.prix_ht);
         
-        const monthSales = sales?.filter(s => s.mois.startsWith(monthStr)) || [];
-        const monthExpenses = expenses?.filter(e => e.mois.startsWith(monthStr)) || [];
+        const product = products.find(p => p.id === productId);
+        const prixBtc = Number(product?.prix_btc || 0);
+        
+        if (category === 'BTC') return prixBtc;
+        if (category === 'BTB') return prixBtc * 0.7;
+        return prixBtc * 0.7 * 0.85;
+      };
+
+      const getProductTvaRate = (productId: string): number => {
+        const product = products.find(p => p.id === productId);
+        return product?.tva_taux ?? 6;
+      };
+
+      const getProductCosts = (productId: string): { 
+        matieres_ht: number; 
+        emballages_ht: number; 
+        variables_ht: number;
+        tva_matieres: number;
+        tva_emballages: number;
+        tva_variables: number;
+      } => {
+        const productRecipes = recipes.filter(r => r.product_id === productId);
+        let matieres_ht = 0;
+        let tva_matieres = 0;
+        productRecipes.forEach(recipe => {
+          const ingredient = ingredients.find(i => i.id === recipe.ingredient_id);
+          const ht = Number(recipe.quantite_utilisee) * Number(ingredient?.cout_unitaire || 0);
+          const tvaTaux = ingredient?.tva_taux ?? 21;
+          matieres_ht += ht;
+          tva_matieres += ht * (tvaTaux / 100);
+        });
+
+        const productPacks = productPackaging.filter(pp => pp.product_id === productId);
+        let emballages_ht = 0;
+        let tva_emballages = 0;
+        productPacks.forEach(pack => {
+          const pkg = packaging.find(p => p.id === pack.packaging_id);
+          const ht = Number(pack.quantite) * Number(pkg?.cout_unitaire || 0);
+          const tvaTaux = pkg?.tva_taux ?? 21;
+          emballages_ht += ht;
+          tva_emballages += ht * (tvaTaux / 100);
+        });
+
+        const productVarCosts = productVariableCosts.filter(pvc => pvc.product_id === productId);
+        let variables_ht = 0;
+        let tva_variables = 0;
+        productVarCosts.forEach(pvc => {
+          const vc = variableCosts.find(v => v.id === pvc.variable_cost_id);
+          const ht = Number(pvc.quantite) * Number(vc?.cout_unitaire || 0);
+          const tvaTaux = vc?.tva_taux ?? 21;
+          variables_ht += ht;
+          tva_variables += ht * (tvaTaux / 100);
+        });
+
+        return { matieres_ht, emballages_ht, variables_ht, tva_matieres, tva_emballages, tva_variables };
+      };
+
+      // 5. Calculate monthly data
+      const monthlyData: FinancialReportData[] = [];
+
+      for (let i = 0; i < 12; i++) {
+        const monthStr = `${year}-${(i + 1).toString().padStart(2, '0')}-01`;
+        const monthKey = `${year}-${(i + 1).toString().padStart(2, '0')}`;
+        const coef = Number(coefficients[i]) / 100;
 
         let ca_ht = 0;
         let cout_production = 0;
         let tva_collectee = 0;
         let tva_deductible = 0;
 
-        monthSales.forEach(sale => {
-          const price = prices?.find(p => 
-            p.product_id === sale.product_id && 
-            p.categorie_prix === sale.categorie_prix
-          );
-          const quantity = sale[quantityField] || 0;
-          const prixHt = price?.prix_ht || 0;
-          const tvaTaux = price?.tva_taux || 5.5;
-
-          ca_ht += prixHt * quantity;
-          tva_collectee += prixHt * quantity * (tvaTaux / 100);
-
-          // Calculate production cost
-          const productRecipes = recipes?.filter(r => r.product_id === sale.product_id) || [];
-          const productPkg = productPackaging?.filter(p => p.product_id === sale.product_id) || [];
+        // Process annual sales with seasonality
+        (annualSales || []).forEach(sale => {
+          const annualQty = Number(sale.quantite_annuelle) || 0;
+          const monthQty = Math.round(annualQty * coef);
           
-          let unitCost = 0;
-          productRecipes.forEach(r => {
-            unitCost += (r.ingredients?.cout_unitaire || 0) * r.quantite_utilisee;
-            tva_deductible += (r.ingredients?.cout_unitaire || 0) * r.quantite_utilisee * ((r.ingredients?.tva_taux || 5.5) / 100) * quantity;
-          });
-          productPkg.forEach(p => {
-            unitCost += (p.packaging?.cout_unitaire || 0) * p.quantite;
-            tva_deductible += (p.packaging?.cout_unitaire || 0) * p.quantite * ((p.packaging?.tva_taux || 20) / 100) * quantity;
-          });
+          const prix = sale.prix_ht_override 
+            ? Number(sale.prix_ht_override) 
+            : getPrice(sale.product_id, sale.categorie_prix);
           
-          cout_production += unitCost * quantity;
+          const saleCaHt = monthQty * prix;
+          ca_ht += saleCaHt;
+          
+          const tvaTaux = getProductTvaRate(sale.product_id);
+          tva_collectee += saleCaHt * (tvaTaux / 100);
+
+          // Production costs
+          const costs = getProductCosts(sale.product_id);
+          cout_production += monthQty * (costs.matieres_ht + costs.emballages_ht + costs.variables_ht);
+          tva_deductible += monthQty * (costs.tva_matieres + costs.tva_emballages + costs.tva_variables);
         });
 
-        const frais_fixes = monthExpenses.reduce((sum, e) => sum + (e.montant_ht || 0), 0);
-        tva_deductible += monthExpenses.reduce((sum, e) => sum + (e.montant_ht * ((e.tva_taux || 20) / 100)), 0);
+        // Professional expenses for this month
+        const monthExpenses = (expenses || []).filter(e => e.mois.startsWith(monthKey));
+        let frais_fixes = 0;
+        monthExpenses.forEach(e => {
+          const ht = Number(e.montant_ht);
+          const tvaTaux = e.tva_taux ?? 21;
+          frais_fixes += ht;
+          tva_deductible += ht * (tvaTaux / 100);
+        });
 
         const marge_brute = ca_ht - cout_production;
         const resultat_net = marge_brute - frais_fixes;
+        const taux_marge = ca_ht > 0 ? (marge_brute / ca_ht) * 100 : 0;
+        const tva_nette = tva_collectee - tva_deductible;
 
         monthlyData.push({
-          periode: monthStart,
+          periode: monthStr,
           ca_ht,
           cout_production,
           marge_brute,
-          taux_marge: ca_ht > 0 ? (marge_brute / ca_ht) * 100 : 0,
+          taux_marge,
           frais_fixes,
           resultat_net,
           tva_collectee,
           tva_deductible,
-          tva_nette: tva_collectee - tva_deductible,
+          tva_nette,
         });
       }
+
+      console.log('[useFinancialReport] dataSourcesUsed:', {
+        annual_sales: annualSales?.length || 0,
+        seasonality_coefficients: coefData ? 1 : 0,
+        expenses: expenses?.length || 0,
+        products: products.length,
+      });
 
       return monthlyData;
     },
@@ -184,65 +304,70 @@ export const useFinancialReport = (year: number, mode: ReportMode = 'budget') =>
   });
 };
 
+/**
+ * Product Report Hook
+ * Uses annual_sales as the single source of truth for volumes
+ */
 export const useProductReport = (year: number, mode: ReportMode = 'budget') => {
   const { currentProject } = useProject();
-  const dbMode = mapModeForProducts(mode);
 
   return useQuery({
     queryKey: ['product-report', currentProject?.id, mode, year],
     queryFn: async (): Promise<ProductReportData[]> => {
       if (!currentProject?.id) return [];
 
-      const startDate = `${year}-01-01`;
-      const endDate = `${year}-12-31`;
+      // DEBUG: Log parameters
+      console.log('[useProductReport] year:', year, 'mode:', mode);
 
-      // Fetch products with categories
-      const { data: products } = await supabase
-        .from('products')
-        .select('*, categories(nom_categorie)')
-        .eq('project_id', currentProject.id)
-        .eq('mode', dbMode);
-
-      // Fetch all prices
-      const { data: prices } = await supabase
-        .from('product_prices')
-        .select('*')
-        .eq('mode', dbMode);
-
-      // Fetch recipes
-      const { data: recipes } = await supabase
-        .from('recipes')
-        .select('*, ingredients(*)')
-        .eq('mode', dbMode);
-
-      // Fetch packaging
-      const { data: productPackaging } = await supabase
-        .from('product_packaging')
-        .select('*, packaging(*)')
-        .eq('mode', dbMode);
-
-      // Fetch variable costs
-      const { data: variableCosts } = await supabase
-        .from('product_variable_costs')
-        .select('*, variable_costs(*)')
-        .eq('mode', dbMode);
-
-      // Fetch sales based on mode - use annual_sales for better data
+      // Fetch annual sales for the mode (SINGLE SOURCE OF TRUTH)
       const { data: annualSales } = await supabase
         .from('annual_sales')
         .select('*')
         .eq('project_id', currentProject.id)
-        .eq('mode', mode)
-        .eq('year', year);
+        .eq('year', year)
+        .eq('mode', mode);
+
+      console.log('[useProductReport] annualSales count:', annualSales?.length || 0);
+
+      // Collect product IDs from sales
+      const productIdsFromSales = [...new Set((annualSales || []).map(s => s.product_id))];
+
+      // Also fetch all products to show products without sales
+      const { data: allProducts } = await supabase
+        .from('products')
+        .select('*, categories(nom_categorie)')
+        .eq('project_id', currentProject.id)
+        .eq('mode', 'simulation');
+
+      const products = allProducts || [];
+      const productIds = products.map(p => p.id);
+
+      if (productIds.length === 0) {
+        console.log('[useProductReport] No products found');
+        return [];
+      }
+
+      // Fetch all related data
+      const [pricesRes, recipesRes, packagingRes, variableCostsRes] = await Promise.all([
+        supabase.from('product_prices').select('*').in('product_id', productIds).eq('mode', 'simulation'),
+        supabase.from('recipes').select('*, ingredients(*)').in('product_id', productIds).eq('mode', 'simulation'),
+        supabase.from('product_packaging').select('*, packaging(*)').in('product_id', productIds).eq('mode', 'simulation'),
+        supabase.from('product_variable_costs').select('*, variable_costs(*)').in('product_id', productIds).eq('mode', 'simulation'),
+      ]);
+
+      const prices = pricesRes.data || [];
+      const recipes = recipesRes.data || [];
+      const productPackaging = packagingRes.data || [];
+      const variableCosts = variableCostsRes.data || [];
 
       const productData: ProductReportData[] = [];
       let totalMarge = 0;
 
-      products?.forEach(product => {
+      products.forEach(product => {
         // Calculate production cost
-        const productRecipes = recipes?.filter(r => r.product_id === product.id) || [];
-        const productPkg = productPackaging?.filter(p => p.product_id === product.id) || [];
-        const productVC = variableCosts?.filter(vc => vc.product_id === product.id) || [];
+        const productRecipes = recipes.filter(r => r.product_id === product.id);
+        const productPkg = productPackaging.filter(p => p.product_id === product.id);
+        const productVC = variableCosts.filter(vc => vc.product_id === product.id);
 
         let cout_revient = 0;
         productRecipes.forEach(r => {
@@ -255,15 +380,30 @@ export const useProductReport = (year: number, mode: ReportMode = 'budget') => {
           cout_revient += (vc.variable_costs?.cout_unitaire || 0) * vc.quantite;
         });
 
-        // Calculate average selling price
-        const productPrices = prices?.filter(p => p.product_id === product.id) || [];
-        const prix_vente_moyen = productPrices.length > 0
-          ? productPrices.reduce((sum, p) => sum + p.prix_ht, 0) / productPrices.length
-          : product.prix_btc;
+        // Calculate average selling price and volume from annual_sales
+        const productSales = (annualSales || []).filter(s => s.product_id === product.id);
+        const productPrices = prices.filter(p => p.product_id === product.id);
+        
+        let totalVolume = 0;
+        let weightedPriceSum = 0;
+        
+        productSales.forEach(sale => {
+          const qty = Number(sale.quantite_annuelle) || 0;
+          const price = productPrices.find(p => p.categorie_prix === sale.categorie_prix);
+          const prixHt = sale.prix_ht_override 
+            ? Number(sale.prix_ht_override) 
+            : (price?.prix_ht || product.prix_btc);
+          
+          totalVolume += qty;
+          weightedPriceSum += qty * prixHt;
+        });
 
-        // Calculate sales volume from annual_sales
-        const productSales = annualSales?.filter(s => s.product_id === product.id) || [];
-        const volume_vendu = productSales.reduce((sum, s) => sum + (s.quantite_annuelle || 0), 0);
+        const volume_vendu = totalVolume;
+        const prix_vente_moyen = volume_vendu > 0 
+          ? weightedPriceSum / volume_vendu 
+          : (productPrices.length > 0 
+              ? productPrices.reduce((sum, p) => sum + p.prix_ht, 0) / productPrices.length 
+              : product.prix_btc);
 
         const marge_unitaire = prix_vente_moyen - cout_revient;
         const coefficient = cout_revient > 0 ? prix_vente_moyen / cout_revient : 0;
@@ -286,84 +426,170 @@ export const useProductReport = (year: number, mode: ReportMode = 'budget') => {
         });
       });
 
-      // Calculate contribution percentage
-      return productData.map(p => ({
-        ...p,
-        contribution_marge_pct: totalMarge > 0 ? (p.contribution_marge / totalMarge) * 100 : 0,
-      }));
+      console.log('[useProductReport] dataSourcesUsed:', {
+        annual_sales: annualSales?.length || 0,
+        products: products.length,
+      });
+
+      return productData;
     },
     enabled: !!currentProject?.id,
   });
 };
 
+/**
+ * Sales Report Hook
+ * Uses annual_sales + seasonality for both budget and reel
+ * Budget = annual_sales mode='budget' with budget seasonality
+ * Reel = annual_sales mode='reel' with reel seasonality
+ */
 export const useSalesReport = (year: number, mode: ReportMode = 'budget') => {
   const { currentProject } = useProject();
-  const dbMode = mapModeForProducts(mode);
 
   return useQuery({
     queryKey: ['sales-report', currentProject?.id, mode, year],
     queryFn: async (): Promise<SalesReportData[]> => {
       if (!currentProject?.id) return [];
 
-      const startDate = `${year}-01-01`;
-      const endDate = `${year}-12-31`;
+      // DEBUG: Log parameters
+      console.log('[useSalesReport] year:', year, 'mode:', mode);
 
-      // Fetch targets (always from sales_targets for comparison)
-      const { data: targets } = await supabase
-        .from('sales_targets')
+      // Fetch BUDGET coefficients
+      const { data: budgetCoefData } = await supabase
+        .from('seasonality_coefficients')
         .select('*')
         .eq('project_id', currentProject.id)
-        .gte('mois', startDate)
-        .lte('mois', endDate);
+        .eq('year', year)
+        .eq('mode', 'budget')
+        .maybeSingle();
 
-      // Fetch actuals
-      const { data: actuals } = await supabase
-        .from('sales_actuals')
+      // Fetch REEL coefficients
+      const { data: reelCoefData } = await supabase
+        .from('seasonality_coefficients')
         .select('*')
         .eq('project_id', currentProject.id)
-        .gte('mois', startDate)
-        .lte('mois', endDate);
+        .eq('year', year)
+        .eq('mode', 'reel')
+        .maybeSingle();
 
-      // Fetch prices
+      const budgetCoefficients = budgetCoefData
+        ? [
+            Number(budgetCoefData.month_01), Number(budgetCoefData.month_02), Number(budgetCoefData.month_03),
+            Number(budgetCoefData.month_04), Number(budgetCoefData.month_05), Number(budgetCoefData.month_06),
+            Number(budgetCoefData.month_07), Number(budgetCoefData.month_08), Number(budgetCoefData.month_09),
+            Number(budgetCoefData.month_10), Number(budgetCoefData.month_11), Number(budgetCoefData.month_12),
+          ]
+        : DEFAULT_COEFFICIENTS;
+
+      const reelCoefficients = reelCoefData
+        ? [
+            Number(reelCoefData.month_01), Number(reelCoefData.month_02), Number(reelCoefData.month_03),
+            Number(reelCoefData.month_04), Number(reelCoefData.month_05), Number(reelCoefData.month_06),
+            Number(reelCoefData.month_07), Number(reelCoefData.month_08), Number(reelCoefData.month_09),
+            Number(reelCoefData.month_10), Number(reelCoefData.month_11), Number(reelCoefData.month_12),
+          ]
+        : DEFAULT_COEFFICIENTS;
+
+      // Fetch BUDGET annual sales
+      const { data: budgetSales } = await supabase
+        .from('annual_sales')
+        .select('*')
+        .eq('project_id', currentProject.id)
+        .eq('year', year)
+        .eq('mode', 'budget');
+
+      // Fetch REEL annual sales
+      const { data: reelSales } = await supabase
+        .from('annual_sales')
+        .select('*')
+        .eq('project_id', currentProject.id)
+        .eq('year', year)
+        .eq('mode', 'reel');
+
+      console.log('[useSalesReport] budgetSales count:', budgetSales?.length || 0);
+      console.log('[useSalesReport] reelSales count:', reelSales?.length || 0);
+
+      // Collect product IDs
+      const allProductIds = [...new Set([
+        ...(budgetSales || []).map(s => s.product_id),
+        ...(reelSales || []).map(s => s.product_id),
+      ])];
+
+      if (allProductIds.length === 0) {
+        console.log('[useSalesReport] No sales data found');
+        return [];
+      }
+
+      // Fetch products and prices
+      const { data: products } = await supabase
+        .from('products')
+        .select('id, nom_produit, prix_btc')
+        .in('id', allProductIds);
+
       const { data: prices } = await supabase
         .from('product_prices')
         .select('*')
-        .eq('mode', dbMode);
+        .in('product_id', allProductIds)
+        .eq('mode', 'simulation');
 
+      // Helper: get price for a product/category
+      const getPrice = (productId: string, category: string): number => {
+        const price = (prices || []).find(
+          p => p.product_id === productId && p.categorie_prix === category
+        );
+        if (price) return Number(price.prix_ht);
+        
+        const product = (products || []).find(p => p.id === productId);
+        const prixBtc = Number(product?.prix_btc || 0);
+        
+        if (category === 'BTC') return prixBtc;
+        if (category === 'BTB') return prixBtc * 0.7;
+        return prixBtc * 0.7 * 0.85;
+      };
+
+      // Generate sales data by month and channel
       const salesData: SalesReportData[] = [];
       const canaux = ['BTC', 'BTB', 'Distributeur'];
 
-      for (let month = 1; month <= 12; month++) {
-        const monthStr = `${year}-${month.toString().padStart(2, '0')}`;
+      for (let i = 0; i < 12; i++) {
+        const monthStr = `${year}-${(i + 1).toString().padStart(2, '0')}-01`;
+        const budgetCoef = Number(budgetCoefficients[i]) / 100;
+        const reelCoef = Number(reelCoefficients[i]) / 100;
 
         canaux.forEach(canal => {
-          const monthTargets = targets?.filter(t => 
-            t.mois.startsWith(monthStr) && t.categorie_prix === canal
-          ) || [];
-          const monthActuals = actuals?.filter(a => 
-            a.mois.startsWith(monthStr) && a.categorie_prix === canal
-          ) || [];
-
           let objectif_volume = 0;
           let objectif_ca = 0;
           let volume = 0;
           let ca_ht = 0;
 
-          monthTargets.forEach(t => {
-            objectif_volume += t.quantite_objectif || 0;
-            const price = prices?.find(p => p.product_id === t.product_id && p.categorie_prix === canal);
-            objectif_ca += (t.quantite_objectif || 0) * (price?.prix_ht || 0);
+          // Budget data (objectifs)
+          (budgetSales || []).filter(s => s.categorie_prix === canal).forEach(sale => {
+            const annualQty = Number(sale.quantite_annuelle) || 0;
+            const monthQty = Math.round(annualQty * budgetCoef);
+            const prix = sale.prix_ht_override 
+              ? Number(sale.prix_ht_override) 
+              : getPrice(sale.product_id, canal);
+            
+            objectif_volume += monthQty;
+            objectif_ca += monthQty * prix;
           });
 
-          monthActuals.forEach(a => {
-            volume += a.quantite_reelle || 0;
-            const price = prices?.find(p => p.product_id === a.product_id && p.categorie_prix === canal);
-            ca_ht += (a.quantite_reelle || 0) * (price?.prix_ht || 0);
+          // Reel data
+          (reelSales || []).filter(s => s.categorie_prix === canal).forEach(sale => {
+            const annualQty = Number(sale.quantite_annuelle) || 0;
+            const monthQty = Math.round(annualQty * reelCoef);
+            const prix = sale.prix_ht_override 
+              ? Number(sale.prix_ht_override) 
+              : getPrice(sale.product_id, canal);
+            
+            volume += monthQty;
+            ca_ht += monthQty * prix;
           });
 
+          // Only add if there's any data
           if (objectif_volume > 0 || volume > 0) {
             salesData.push({
-              periode: `${monthStr}-01`,
+              periode: monthStr,
               canal,
               volume,
               ca_ht,
@@ -376,26 +602,38 @@ export const useSalesReport = (year: number, mode: ReportMode = 'budget') => {
         });
       }
 
+      console.log('[useSalesReport] dataSourcesUsed:', {
+        budget_sales: budgetSales?.length || 0,
+        reel_sales: reelSales?.length || 0,
+      });
+
       return salesData;
     },
     enabled: !!currentProject?.id,
   });
 };
 
+/**
+ * Stock Report Hook
+ */
 export const useStockReport = (mode: ReportMode = 'budget') => {
   const { currentProject } = useProject();
-  const dbMode = mapModeForProducts(mode);
 
   return useQuery({
     queryKey: ['stock-report', currentProject?.id, mode],
     queryFn: async (): Promise<StockReportData[]> => {
       if (!currentProject?.id) return [];
 
+      // DEBUG: Log parameters
+      console.log('[useStockReport] mode:', mode);
+
       const { data: stocks } = await supabase
         .from('stocks')
         .select('*, ingredients(*), packaging(*), products(*)')
         .eq('project_id', currentProject.id)
-        .eq('mode', mode === 'budget' ? 'reel' : 'reel'); // Stocks are typically real
+        .eq('mode', 'reel'); // Stocks are typically real
+
+      console.log('[useStockReport] stocks count:', stocks?.length || 0);
 
       // Fetch movements for rotation calculation
       const { data: movements } = await supabase

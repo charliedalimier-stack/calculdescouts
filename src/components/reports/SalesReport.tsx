@@ -48,6 +48,9 @@ const getEcartBadge = (ecart: number) => {
 export function SalesReport({ year, mode }: SalesReportProps) {
   const { data: salesData, isLoading } = useSalesReport(year, mode);
 
+  // DEBUG: Log parameters and data
+  console.log('[SalesReport] year:', year, 'mode:', mode, 'dataCount:', salesData?.length);
+
   if (isLoading) {
     return <div className="flex items-center justify-center p-8">Chargement...</div>;
   }
@@ -58,7 +61,7 @@ export function SalesReport({ year, mode }: SalesReportProps) {
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
           Aucune donnée de ventes disponible pour {year}.
-          Ajoutez des objectifs et des ventes réelles pour voir le rapport.
+          Ajoutez des ventes annuelles Budget et Réel dans le module Ventes pour voir le rapport.
         </AlertDescription>
       </Alert>
     );

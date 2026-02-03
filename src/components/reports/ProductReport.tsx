@@ -61,6 +61,9 @@ const getCoefficientBadge = (coef: number) => {
 export function ProductReport({ year, mode }: ProductReportProps) {
   const { data: productData, isLoading } = useProductReport(year, mode);
 
+  // DEBUG: Log parameters and data
+  console.log('[ProductReport] year:', year, 'mode:', mode, 'dataCount:', productData?.length);
+
   if (isLoading) {
     return <div className="flex items-center justify-center p-8">Chargement...</div>;
   }
@@ -71,7 +74,7 @@ export function ProductReport({ year, mode }: ProductReportProps) {
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
           Aucun produit disponible pour {year} en mode {mode === 'budget' ? 'Budget' : 'Réel'}.
-          Ajoutez des produits et des ventes pour voir le rapport.
+          Ajoutez des produits dans le module Produits pour voir le rapport.
         </AlertDescription>
       </Alert>
     );

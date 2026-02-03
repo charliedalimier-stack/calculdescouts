@@ -45,11 +45,17 @@ const TrendIcon = ({ value }: { value: number }) => {
 export function FinancialReport({ year, mode }: FinancialReportProps) {
   const { data: financialData, isLoading } = useFinancialReport(year, mode);
 
+  // DEBUG: Log parameters and data
+  console.log('[FinancialReport] year:', year, 'mode:', mode, 'dataCount:', financialData?.length);
+
   if (isLoading) {
     return <div className="flex items-center justify-center p-8">Chargement...</div>;
   }
 
-  const hasData = financialData && financialData.some(d => d.ca_ht > 0);
+  // Check if there's ANY data (CA, costs, or expenses)
+  const hasData = financialData && financialData.some(d => 
+    d.ca_ht > 0 || d.cout_production > 0 || d.frais_fixes > 0
+  );
 
   if (!hasData) {
     return (
@@ -57,7 +63,7 @@ export function FinancialReport({ year, mode }: FinancialReportProps) {
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
           Aucune donnée financière disponible pour {year} en mode {mode === 'budget' ? 'Budget' : 'Réel'}.
-          Ajoutez des ventes et des frais pour voir les rapports.
+          Ajoutez des ventes annuelles dans le module Ventes pour voir les rapports.
         </AlertDescription>
       </Alert>
     );

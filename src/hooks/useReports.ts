@@ -67,19 +67,29 @@ export const useFinancialReport = (year: number, mode: ReportMode = 'budget') =>
   return useQuery({
     queryKey: ['financial-report', currentProject?.id, mode, year],
     queryFn: async (): Promise<FinancialReportData[]> => {
-      if (!currentProject?.id) return [];
+      if (!currentProject?.id) {
+        console.log('[useFinancialReport] ❌ NO PROJECT ID - returning empty');
+        return [];
+      }
 
-      // DEBUG: Log parameters
-      console.log('[useFinancialReport] year:', year, 'mode:', mode);
+      // ========== DIAGNOSTIC LOGS ==========
+      console.log('==========================================');
+      console.log('[useFinancialReport] DIAGNOSTIC START');
+      console.log('[useFinancialReport] year:', year);
+      console.log('[useFinancialReport] mode:', mode);
+      console.log('[useFinancialReport] project_id:', currentProject.id);
+      console.log('==========================================');
 
       // 1. Fetch seasonality coefficients for the mode
-      const { data: coefData } = await supabase
+      const { data: coefData, error: coefError } = await supabase
         .from('seasonality_coefficients')
         .select('*')
         .eq('project_id', currentProject.id)
         .eq('year', year)
         .eq('mode', mode)
         .maybeSingle();
+
+      console.log('[useFinancialReport] seasonality_coefficients:', coefData ? 'FOUND' : 'NOT FOUND', coefError ? `ERROR: ${coefError.message}` : '');
 
       const coefficients = coefData
         ? [
@@ -91,14 +101,18 @@ export const useFinancialReport = (year: number, mode: ReportMode = 'budget') =>
         : DEFAULT_COEFFICIENTS;
 
       // 2. Fetch annual sales for the mode (SINGLE SOURCE OF TRUTH)
-      const { data: annualSales } = await supabase
+      const { data: annualSales, error: salesError } = await supabase
         .from('annual_sales')
         .select('*')
         .eq('project_id', currentProject.id)
         .eq('year', year)
         .eq('mode', mode);
 
-      console.log('[useFinancialReport] annualSales count:', annualSales?.length || 0);
+      console.log('[useFinancialReport] annual_sales query params:', { project_id: currentProject.id, year, mode });
+      console.log('[useFinancialReport] annual_sales count:', annualSales?.length || 0, salesError ? `ERROR: ${salesError.message}` : '');
+      if (annualSales && annualSales.length > 0) {
+        console.log('[useFinancialReport] annual_sales first row:', annualSales[0]);
+      }
 
       // 3. Collect product IDs and fetch related data
       const productIds = [...new Set((annualSales || []).map(s => s.product_id))];
@@ -314,36 +328,49 @@ export const useProductReport = (year: number, mode: ReportMode = 'budget') => {
   return useQuery({
     queryKey: ['product-report', currentProject?.id, mode, year],
     queryFn: async (): Promise<ProductReportData[]> => {
-      if (!currentProject?.id) return [];
+      if (!currentProject?.id) {
+        console.log('[useProductReport] ❌ NO PROJECT ID - returning empty');
+        return [];
+      }
 
-      // DEBUG: Log parameters
-      console.log('[useProductReport] year:', year, 'mode:', mode);
+      // ========== DIAGNOSTIC LOGS ==========
+      console.log('==========================================');
+      console.log('[useProductReport] DIAGNOSTIC START');
+      console.log('[useProductReport] year:', year);
+      console.log('[useProductReport] mode:', mode);
+      console.log('[useProductReport] project_id:', currentProject.id);
+      console.log('==========================================');
 
       // Fetch annual sales for the mode (SINGLE SOURCE OF TRUTH)
-      const { data: annualSales } = await supabase
+      const { data: annualSales, error: salesError } = await supabase
         .from('annual_sales')
         .select('*')
         .eq('project_id', currentProject.id)
         .eq('year', year)
         .eq('mode', mode);
 
-      console.log('[useProductReport] annualSales count:', annualSales?.length || 0);
+      console.log('[useProductReport] annual_sales query params:', { project_id: currentProject.id, year, mode });
+      console.log('[useProductReport] annual_sales count:', annualSales?.length || 0, salesError ? `ERROR: ${salesError.message}` : '');
 
       // Collect product IDs from sales
       const productIdsFromSales = [...new Set((annualSales || []).map(s => s.product_id))];
+      console.log('[useProductReport] productIdsFromSales:', productIdsFromSales);
 
       // Also fetch all products to show products without sales
-      const { data: allProducts } = await supabase
+      const { data: allProducts, error: productsError } = await supabase
         .from('products')
         .select('*, categories(nom_categorie)')
         .eq('project_id', currentProject.id)
         .eq('mode', 'simulation');
 
+      console.log('[useProductReport] products query params:', { project_id: currentProject.id, mode: 'simulation' });
+      console.log('[useProductReport] products count:', allProducts?.length || 0, productsError ? `ERROR: ${productsError.message}` : '');
+
       const products = allProducts || [];
       const productIds = products.map(p => p.id);
 
       if (productIds.length === 0) {
-        console.log('[useProductReport] No products found');
+        console.log('[useProductReport] ❌ No products found - returning empty');
         return [];
       }
 
@@ -449,13 +476,21 @@ export const useSalesReport = (year: number, mode: ReportMode = 'budget') => {
   return useQuery({
     queryKey: ['sales-report', currentProject?.id, mode, year],
     queryFn: async (): Promise<SalesReportData[]> => {
-      if (!currentProject?.id) return [];
+      if (!currentProject?.id) {
+        console.log('[useSalesReport] ❌ NO PROJECT ID - returning empty');
+        return [];
+      }
 
-      // DEBUG: Log parameters
-      console.log('[useSalesReport] year:', year, 'mode:', mode);
+      // ========== DIAGNOSTIC LOGS ==========
+      console.log('==========================================');
+      console.log('[useSalesReport] DIAGNOSTIC START');
+      console.log('[useSalesReport] year:', year);
+      console.log('[useSalesReport] mode:', mode);
+      console.log('[useSalesReport] project_id:', currentProject.id);
+      console.log('==========================================');
 
       // Fetch BUDGET coefficients
-      const { data: budgetCoefData } = await supabase
+      const { data: budgetCoefData, error: budgetCoefError } = await supabase
         .from('seasonality_coefficients')
         .select('*')
         .eq('project_id', currentProject.id)
@@ -463,14 +498,18 @@ export const useSalesReport = (year: number, mode: ReportMode = 'budget') => {
         .eq('mode', 'budget')
         .maybeSingle();
 
+      console.log('[useSalesReport] budget seasonality:', budgetCoefData ? 'FOUND' : 'NOT FOUND', budgetCoefError ? `ERROR: ${budgetCoefError.message}` : '');
+
       // Fetch REEL coefficients
-      const { data: reelCoefData } = await supabase
+      const { data: reelCoefData, error: reelCoefError } = await supabase
         .from('seasonality_coefficients')
         .select('*')
         .eq('project_id', currentProject.id)
         .eq('year', year)
         .eq('mode', 'reel')
         .maybeSingle();
+
+      console.log('[useSalesReport] reel seasonality:', reelCoefData ? 'FOUND' : 'NOT FOUND', reelCoefError ? `ERROR: ${reelCoefError.message}` : '');
 
       const budgetCoefficients = budgetCoefData
         ? [
@@ -491,23 +530,26 @@ export const useSalesReport = (year: number, mode: ReportMode = 'budget') => {
         : DEFAULT_COEFFICIENTS;
 
       // Fetch BUDGET annual sales
-      const { data: budgetSales } = await supabase
+      const { data: budgetSales, error: budgetSalesError } = await supabase
         .from('annual_sales')
         .select('*')
         .eq('project_id', currentProject.id)
         .eq('year', year)
         .eq('mode', 'budget');
 
+      console.log('[useSalesReport] budget sales query params:', { project_id: currentProject.id, year, mode: 'budget' });
+      console.log('[useSalesReport] budget sales count:', budgetSales?.length || 0, budgetSalesError ? `ERROR: ${budgetSalesError.message}` : '');
+
       // Fetch REEL annual sales
-      const { data: reelSales } = await supabase
+      const { data: reelSales, error: reelSalesError } = await supabase
         .from('annual_sales')
         .select('*')
         .eq('project_id', currentProject.id)
         .eq('year', year)
         .eq('mode', 'reel');
 
-      console.log('[useSalesReport] budgetSales count:', budgetSales?.length || 0);
-      console.log('[useSalesReport] reelSales count:', reelSales?.length || 0);
+      console.log('[useSalesReport] reel sales query params:', { project_id: currentProject.id, year, mode: 'reel' });
+      console.log('[useSalesReport] reel sales count:', reelSales?.length || 0, reelSalesError ? `ERROR: ${reelSalesError.message}` : '');
 
       // Collect product IDs
       const allProductIds = [...new Set([
@@ -515,8 +557,10 @@ export const useSalesReport = (year: number, mode: ReportMode = 'budget') => {
         ...(reelSales || []).map(s => s.product_id),
       ])];
 
+      console.log('[useSalesReport] allProductIds:', allProductIds);
+
       if (allProductIds.length === 0) {
-        console.log('[useSalesReport] No sales data found');
+        console.log('[useSalesReport] ❌ No sales data found - returning empty');
         return [];
       }
 

@@ -81,6 +81,9 @@ const COLORS = [
 export function StockReport({ mode }: StockReportProps) {
   const { data: stockData, isLoading } = useStockReport(mode);
 
+  // DEBUG: Log parameters and data
+  console.log('[StockReport] mode:', mode, 'dataCount:', stockData?.length);
+
   if (isLoading) {
     return <div className="flex items-center justify-center p-8">Chargement...</div>;
   }
@@ -90,7 +93,7 @@ export function StockReport({ mode }: StockReportProps) {
       <Alert>
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
-          Aucun stock disponible. Ajoutez des stocks pour voir le rapport.
+          Aucun stock disponible. Ajoutez des stocks dans le module Stocks pour voir le rapport.
         </AlertDescription>
       </Alert>
     );

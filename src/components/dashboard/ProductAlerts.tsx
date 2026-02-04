@@ -37,10 +37,10 @@ const getAlertStyles = (type: Alert["type"]) => {
 };
 
 interface ProductAlertsProps {
-  mode?: 'simulation' | 'reel';
+  mode?: 'budget' | 'reel';
 }
 
-export function ProductAlerts({ mode = 'simulation' }: ProductAlertsProps) {
+export function ProductAlerts({ mode = 'budget' }: ProductAlertsProps) {
   const { productsWithCosts, isLoadingWithCosts } = useProducts(mode);
   const { settings, isLoading: isLoadingSettings } = useProjectSettings();
 

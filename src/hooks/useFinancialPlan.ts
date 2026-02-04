@@ -134,7 +134,7 @@ export function useFinancialPlan(baseYear: number, fiscalParams: FiscalParams) {
         .from('products')
         .select('id, nom_produit, prix_btc')
         .eq('project_id', currentProject.id)
-        .eq('mode', 'simulation');
+        .eq('mode', 'budget');
 
       const productIds = (products || []).map(p => p.id);
 
@@ -143,28 +143,28 @@ export function useFinancialPlan(baseYear: number, fiscalParams: FiscalParams) {
         .from('product_prices')
         .select('*')
         .in('product_id', productIds)
-        .eq('mode', 'simulation');
+        .eq('mode', 'budget');
 
       // Fetch recipes (ingredient costs)
       const { data: recipes } = await supabase
         .from('recipes')
         .select('product_id, quantite_utilisee, ingredients(cout_unitaire)')
         .in('product_id', productIds)
-        .eq('mode', 'simulation');
+        .eq('mode', 'budget');
 
       // Fetch packaging costs
       const { data: packaging } = await supabase
         .from('product_packaging')
         .select('product_id, quantite, packaging(cout_unitaire)')
         .in('product_id', productIds)
-        .eq('mode', 'simulation');
+        .eq('mode', 'budget');
 
       // Fetch variable costs
       const { data: variableCosts } = await supabase
         .from('product_variable_costs')
         .select('product_id, quantite, variable_costs(cout_unitaire)')
         .in('product_id', productIds)
-        .eq('mode', 'simulation');
+        .eq('mode', 'budget');
 
       // Calculate production cost per product
       const getProductCost = (productId: string): number => {
@@ -237,8 +237,8 @@ export function useFinancialPlan(baseYear: number, fiscalParams: FiscalParams) {
             achatsMarchandises += qty * productCost;
           });
 
-          // Fetch professional expenses for this year/mode
-          const dbMode = mode === 'budget' ? 'simulation' : 'reel';
+          // Fetch professional expenses for this year/mode (now unified)
+          const dbMode = mode;
           const yearStart = `${year}-01-01`;
           const yearEnd = `${year}-12-31`;
           

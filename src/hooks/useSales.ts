@@ -46,9 +46,9 @@ export interface SalesData {
  * Hook to manage sales data.
  * 
  * @param month - Optional month in format 'YYYY-MM-01'. Defaults to current month.
- * @param mode - Optional mode ('simulation' | 'reel'). Defaults to 'simulation'.
+ * @param mode - Optional mode ('budget' | 'reel'). Defaults to 'budget'.
  */
-export function useSales(month?: string, mode: 'simulation' | 'reel' = 'simulation') {
+export function useSales(month?: string, mode: 'budget' | 'reel' = 'budget') {
   const { currentProject } = useProject();
   const queryClient = useQueryClient();
   
@@ -272,9 +272,9 @@ export function useSales(month?: string, mode: 'simulation' | 'reel' = 'simulati
  * Hook for annual sales view.
  * 
  * @param year - The year to fetch sales for.
- * @param mode - Optional mode ('simulation' | 'reel'). Defaults to 'simulation'.
+ * @param mode - Optional mode ('budget' | 'reel'). Defaults to 'budget'.
  */
-export function useAnnualSales(year: number, mode: 'simulation' | 'reel' = 'simulation') {
+export function useAnnualSales(year: number, mode: 'budget' | 'reel' = 'budget') {
   const { currentProject } = useProject();
   const queryClient = useQueryClient();
 

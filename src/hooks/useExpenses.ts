@@ -13,7 +13,7 @@ export interface ProfessionalExpense {
   montant_ht: number;
   tva_taux: number | null;
   montant_ttc: number;
-  mode: 'simulation' | 'reel';
+  mode: 'budget' | 'reel';
   created_at: string;
   updated_at: string;
 }

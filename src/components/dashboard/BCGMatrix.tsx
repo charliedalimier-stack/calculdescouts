@@ -39,16 +39,16 @@ const getQuadrant = (margin: number, volume: number, avgMargin: number, avgVolum
 
 interface BCGMatrixProps {
   year?: number;
-  mode?: 'simulation' | 'reel';
+  mode?: 'budget' | 'reel';
 }
 
-export function BCGMatrix({ year = new Date().getFullYear(), mode = 'simulation' }: BCGMatrixProps) {
-  // Always use 'simulation' for products as it's the source of truth for the catalog
-  const { productsWithCosts, isLoadingWithCosts } = useProducts('simulation');
+export function BCGMatrix({ year = new Date().getFullYear(), mode = 'budget' }: BCGMatrixProps) {
+  // Always use 'budget' for products as it's the source of truth for the catalog
+  const { productsWithCosts, isLoadingWithCosts } = useProducts('budget');
   const { productSales, isLoading: isLoadingSales } = useProductSalesAnalysis(year);
 
   // Convert mode to data mode for selecting correct sales data
-  const dataMode = mode === 'simulation' ? 'budget' : 'reel';
+  const dataMode = mode === 'budget' ? 'budget' : 'reel';
 
   console.log('[BCGMatrix] year:', year, 'mode:', mode, 'dataMode:', dataMode, 'productSales:', productSales?.length, 'products:', productsWithCosts?.length);
 
@@ -135,7 +135,7 @@ export function BCGMatrix({ year = new Date().getFullYear(), mode = 'simulation'
     <Card>
       <CardHeader>
         <CardTitle className="text-base font-semibold">
-          Matrice Produits (BCG) - {mode === 'simulation' ? 'Budget' : 'Réel'} {year}
+          Matrice Produits (BCG) - {mode === 'budget' ? 'Budget' : 'Réel'} {year}
         </CardTitle>
       </CardHeader>
       <CardContent>

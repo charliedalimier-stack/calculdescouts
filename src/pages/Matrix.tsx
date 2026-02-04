@@ -23,9 +23,9 @@ const getQuadrant = (margin: number, volume: number, avgMargin: number, avgVolum
   return "dog";
 };
 
-// Convert DataMode to product/sales mode
-const mapDataModeToProductMode = (mode: DataMode): 'simulation' | 'reel' => {
-  return mode === 'budget' ? 'simulation' : 'reel';
+// Convert DataMode directly to 'budget' | 'reel' (no longer using 'simulation')
+const mapDataModeToProductMode = (mode: DataMode): 'budget' | 'reel' => {
+  return mode;
 };
 
 const Matrix = () => {

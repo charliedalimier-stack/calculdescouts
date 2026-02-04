@@ -1,28 +1,28 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 
-export type AppMode = 'simulation' | 'reel';
+export type AppMode = 'budget' | 'reel';
 
 interface ModeContextType {
   mode: AppMode;
   setMode: (mode: AppMode) => void;
-  isSimulation: boolean;
+  isBudget: boolean;
   isReel: boolean;
-  isBudget: boolean; // Alias for isSimulation
 }
 
 const ModeContext = createContext<ModeContextType | undefined>(undefined);
 
 export function ModeProvider({ children }: { children: ReactNode }) {
-  const [mode, setMode] = useState<AppMode>('simulation');
+  const [mode, setMode] = useState<AppMode>('budget');
+
+  console.log('[ModeContext] Current mode:', mode);
 
   return (
     <ModeContext.Provider
       value={{
         mode,
         setMode,
-        isSimulation: mode === 'simulation',
+        isBudget: mode === 'budget',
         isReel: mode === 'reel',
-        isBudget: mode === 'simulation', // Budget = simulation
       }}
     >
       {children}

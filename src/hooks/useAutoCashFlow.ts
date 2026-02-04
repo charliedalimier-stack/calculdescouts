@@ -122,10 +122,10 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
       if (productIds.length > 0) {
         const [productsRes, pricesRes, recipesRes, packagingRes, variableCostsRes] = await Promise.all([
           supabase.from('products').select('*').in('id', productIds),
-          supabase.from('product_prices').select('*').in('product_id', productIds).eq('mode', 'simulation'),
-          supabase.from('recipes').select('*').in('product_id', productIds).eq('mode', 'simulation'),
-          supabase.from('product_packaging').select('*').in('product_id', productIds).eq('mode', 'simulation'),
-          supabase.from('product_variable_costs').select('*').in('product_id', productIds).eq('mode', 'simulation'),
+          supabase.from('product_prices').select('*').in('product_id', productIds).eq('mode', 'budget'),
+          supabase.from('recipes').select('*').in('product_id', productIds).eq('mode', 'budget'),
+          supabase.from('product_packaging').select('*').in('product_id', productIds).eq('mode', 'budget'),
+          supabase.from('product_variable_costs').select('*').in('product_id', productIds).eq('mode', 'budget'),
         ]);
 
         products = productsRes.data || [];
@@ -167,8 +167,8 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
         monthlySalesReel = reelData || [];
       }
 
-      // 5. Fetch professional expenses with TVA
-      const expenseMode = mode === 'budget' ? 'simulation' : 'reel';
+      // 5. Fetch professional expenses with TVA (now unified mode)
+      const expenseMode = mode;
       const startOfYear = `${year}-01-01`;
       const endOfYear = `${year}-12-31`;
       

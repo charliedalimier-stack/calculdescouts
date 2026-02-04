@@ -11,7 +11,7 @@ export interface Ingredient {
   unite: string;
   fournisseur: string | null;
   project_id: string;
-  mode: 'simulation' | 'reel';
+  mode: 'budget' | 'reel';
   tva_taux: number | null;
   is_sous_recette: boolean;
   source_product_id: string | null;
@@ -25,7 +25,7 @@ export interface IngredientInsert {
   unite: string;
   fournisseur?: string | null;
   project_id: string;
-  mode?: 'simulation' | 'reel';
+  mode?: 'budget' | 'reel';
   tva_taux?: number | null;
   is_sous_recette?: boolean;
   source_product_id?: string | null;
@@ -49,7 +49,7 @@ export function useIngredients() {
         .order('nom_ingredient');
       
       if (error) throw error;
-      return data.map(d => ({ ...d, mode: d.mode as 'simulation' | 'reel' })) as Ingredient[];
+      return data.map(d => ({ ...d, mode: d.mode as 'budget' | 'reel' })) as Ingredient[];
     },
     enabled: !!currentProject?.id,
   });

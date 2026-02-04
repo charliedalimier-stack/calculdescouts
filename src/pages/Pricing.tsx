@@ -123,7 +123,7 @@ const Pricing = () => {
   return (
     <AppLayout
       title="Tarification"
-      subtitle={`Calculez vos prix de vente et analysez vos marges - Mode ${mode === 'simulation' ? 'Simulation' : 'Réel'}`}
+      subtitle={`Calculez vos prix de vente et analysez vos marges - Mode ${mode === 'budget' ? 'Budget' : 'Réel'}`}
     >
       {/* Parameters Card - All changes are applied in REAL-TIME */}
       <Card className="mb-8">

@@ -19,10 +19,10 @@ const getBarColor = (margin: number) => {
 };
 
 interface MarginChartProps {
-  mode?: 'simulation' | 'reel';
+  mode?: 'budget' | 'reel';
 }
 
-export function MarginChart({ mode = 'simulation' }: MarginChartProps) {
+export function MarginChart({ mode = 'budget' }: MarginChartProps) {
   const { productsWithCosts, isLoadingWithCosts } = useProducts(mode);
 
   console.log('[MarginChart] mode:', mode, 'products:', productsWithCosts?.length);

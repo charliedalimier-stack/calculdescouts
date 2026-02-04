@@ -17,10 +17,10 @@ export function ModeToggle() {
         <Tooltip>
           <TooltipTrigger asChild>
             <button
-              onClick={() => setMode('simulation')}
+              onClick={() => setMode('budget')}
               className={cn(
                 'flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-all',
-                mode === 'simulation'
+                mode === 'budget'
                   ? 'bg-chart-4 text-chart-4-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
               )}

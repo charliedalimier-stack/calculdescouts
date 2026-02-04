@@ -2,11 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '@/contexts/ProjectContext';
 
-// Helper to map display mode to database mode
-// 'simulation' = 'budget' in annual_sales table
-// 'reel' = 'reel' in annual_sales table
+// Mode is now unified: 'budget' | 'reel'
+// No more 'simulation' - all references have been normalized to 'budget'
 const mapModeForSales = (mode: string): 'budget' | 'reel' => {
-  return mode === 'simulation' ? 'budget' : 'reel';
+  return mode === 'budget' ? 'budget' : 'reel';
 };
 
 export interface GlobalSynthesis {
@@ -77,7 +76,7 @@ interface UseGlobalSynthesisParams {
   periodType: 'month' | 'year';
   year: number;
   month?: number;
-  mode?: 'simulation' | 'reel';
+  mode?: 'budget' | 'reel';
 }
 
 /**
@@ -86,9 +85,9 @@ interface UseGlobalSynthesisParams {
  * @param periodType - 'month' or 'year'
  * @param year - The year to analyze
  * @param month - Optional month (1-12) for monthly analysis
- * @param mode - Optional mode ('simulation' | 'reel'). Defaults to 'simulation'.
+ * @param mode - Optional mode ('budget' | 'reel'). Defaults to 'budget'.
  */
-export function useGlobalSynthesis({ periodType, year, month, mode = 'simulation' }: UseGlobalSynthesisParams) {
+export function useGlobalSynthesis({ periodType, year, month, mode = 'budget' }: UseGlobalSynthesisParams) {
   const { currentProject } = useProject();
 
   // Log mode usage for debugging

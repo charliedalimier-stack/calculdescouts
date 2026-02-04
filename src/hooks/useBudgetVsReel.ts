@@ -186,7 +186,7 @@ export function useBudgetVsReel({ periodType, year, month }: UseBudgetVsReelPara
           .from('sales_targets')
           .select('*, categorie_prix')
           .eq('project_id', projectId)
-          .eq('mode', 'simulation')
+          .eq('mode', 'budget')
           .gte('mois', startDate)
           .lte('mois', endDate);
 

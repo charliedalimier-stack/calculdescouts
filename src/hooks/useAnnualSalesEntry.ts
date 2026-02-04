@@ -175,10 +175,9 @@ export function useAnnualSalesEntry(year: number, mode: 'budget' | 'reel') {
     queryFn: async () => {
       if (!currentProject?.id) return { entries: [], products: [] };
 
-      // Fetch products - products use 'simulation' for budget mode, 'reel' for actual
-      // Products are shared between budget and actual - we fetch simulation mode products
-      // as the canonical product list
-      const productMode = 'simulation';
+      // Fetch products - products use 'budget' mode as the canonical product list
+      // Products are shared between budget and actual
+      const productMode = 'budget';
       
       const { data: products, error: productsError } = await supabase
         .from('products')
@@ -191,12 +190,12 @@ export function useAnnualSalesEntry(year: number, mode: 'budget' | 'reel') {
 
       const productIds = products.map(p => p.id);
 
-      // Fetch product prices - use simulation mode as the base prices
+      // Fetch product prices - use budget mode as the base prices
       const { data: productPrices } = await supabase
         .from('product_prices')
         .select('*')
         .in('product_id', productIds)
-        .eq('mode', 'simulation');
+        .eq('mode', 'budget');
 
       // Fetch annual sales entries
       const { data: annualSales } = await supabase
@@ -421,7 +420,7 @@ export function useMonthlyDistribution(year: number) {
         })), byChannel: [] };
       }
 
-      // Fetch products (simulation mode = canonical)
+      // Fetch products (budget mode = canonical)
       const { data: products } = await supabase
         .from('products')
         .select('id, nom_produit, prix_btc')
@@ -432,7 +431,7 @@ export function useMonthlyDistribution(year: number) {
         .from('product_prices')
         .select('*')
         .in('product_id', allProductIds)
-        .eq('mode', 'simulation');
+        .eq('mode', 'budget');
 
       // Helper: get price for a product/category
       const getPrice = (productId: string, category: string): number => {
@@ -636,7 +635,7 @@ export function useProductSalesAnalysis(year: number) {
         .from('product_prices')
         .select('*')
         .in('product_id', allProductIds)
-        .eq('mode', 'simulation');
+        .eq('mode', 'budget');
 
       // Helper: get price for a product/category
       const getPrice = (productId: string, category: string): number => {

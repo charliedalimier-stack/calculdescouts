@@ -11,7 +11,7 @@ export interface Packaging {
   unite: string;
   type_emballage: string | null;
   project_id: string;
-  mode: 'simulation' | 'reel';
+  mode: 'budget' | 'reel';
   tva_taux: number | null;
   created_at: string;
   updated_at: string;
@@ -23,7 +23,7 @@ export interface PackagingInsert {
   unite: string;
   type_emballage?: string | null;
   project_id: string;
-  mode?: 'simulation' | 'reel';
+  mode?: 'budget' | 'reel';
   tva_taux?: number | null;
 }
 
@@ -45,7 +45,7 @@ export function usePackaging() {
         .order('nom');
       
       if (error) throw error;
-      return data.map(d => ({ ...d, mode: d.mode as 'simulation' | 'reel' })) as Packaging[];
+      return data.map(d => ({ ...d, mode: d.mode as 'budget' | 'reel' })) as Packaging[];
     },
     enabled: !!currentProject?.id,
   });

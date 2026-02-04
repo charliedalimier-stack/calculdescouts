@@ -41,9 +41,9 @@ const Analysis = () => {
     setDataMode(mode);
   };
 
-  // IMPORTANT: Always use 'simulation' mode for product catalog (source of truth)
+  // IMPORTANT: Always use 'budget' mode for product catalog (source of truth)
   // Sales data from useProductSalesAnalysis already contains budget_ca and reel_ca
-  const { productsWithCosts, isLoadingWithCosts } = useProducts('simulation');
+  const { productsWithCosts, isLoadingWithCosts } = useProducts('budget');
   const { productSales, isLoading: isLoadingSales } = useProductSalesAnalysis(selectedYear);
   const { settings, isLoading: isLoadingSettings } = useProjectSettings();
 
@@ -364,7 +364,7 @@ const Analysis = () => {
 
       {/* Margin and Category Charts */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <MarginChart mode="simulation" />
+        <MarginChart mode="budget" />
         <CategoryPieChart year={selectedYear} mode={dataMode} />
       </div>
 

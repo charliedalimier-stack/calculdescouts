@@ -129,10 +129,10 @@ export const useFinancialReport = (year: number, mode: ReportMode = 'budget') =>
       if (productIds.length > 0) {
         const [productsRes, pricesRes, recipesRes, packagingRes, variableCostsRes] = await Promise.all([
           supabase.from('products').select('*').in('id', productIds),
-          supabase.from('product_prices').select('*').in('product_id', productIds).eq('mode', 'simulation'),
-          supabase.from('recipes').select('*').in('product_id', productIds).eq('mode', 'simulation'),
-          supabase.from('product_packaging').select('*').in('product_id', productIds).eq('mode', 'simulation'),
-          supabase.from('product_variable_costs').select('*').in('product_id', productIds).eq('mode', 'simulation'),
+          supabase.from('product_prices').select('*').in('product_id', productIds).eq('mode', 'budget'),
+          supabase.from('recipes').select('*').in('product_id', productIds).eq('mode', 'budget'),
+          supabase.from('product_packaging').select('*').in('product_id', productIds).eq('mode', 'budget'),
+          supabase.from('product_variable_costs').select('*').in('product_id', productIds).eq('mode', 'budget'),
         ]);
 
         products = productsRes.data || [];
@@ -163,8 +163,8 @@ export const useFinancialReport = (year: number, mode: ReportMode = 'budget') =>
         variableCosts = variableCostsDetailsRes.data || [];
       }
 
-      // 4. Fetch professional expenses
-      const expenseMode = mode === 'budget' ? 'simulation' : 'reel';
+      // 4. Fetch professional expenses (now using same mode as budget = 'budget')
+      const expenseMode = mode;
       const startOfYear = `${year}-01-01`;
       const endOfYear = `${year}-12-31`;
       
@@ -361,9 +361,9 @@ export const useProductReport = (year: number, mode: ReportMode = 'budget') => {
         .from('products')
         .select('*, categories(nom_categorie)')
         .eq('project_id', currentProject.id)
-        .eq('mode', 'simulation');
+        .eq('mode', 'budget');
 
-      console.log('[useProductReport] products query params:', { project_id: currentProject.id, mode: 'simulation' });
+      console.log('[useProductReport] products query params:', { project_id: currentProject.id, mode: 'budget' });
       console.log('[useProductReport] products count:', allProducts?.length || 0, productsError ? `ERROR: ${productsError.message}` : '');
 
       const products = allProducts || [];
@@ -376,10 +376,10 @@ export const useProductReport = (year: number, mode: ReportMode = 'budget') => {
 
       // Fetch all related data
       const [pricesRes, recipesRes, packagingRes, variableCostsRes] = await Promise.all([
-        supabase.from('product_prices').select('*').in('product_id', productIds).eq('mode', 'simulation'),
-        supabase.from('recipes').select('*, ingredients(*)').in('product_id', productIds).eq('mode', 'simulation'),
-        supabase.from('product_packaging').select('*, packaging(*)').in('product_id', productIds).eq('mode', 'simulation'),
-        supabase.from('product_variable_costs').select('*, variable_costs(*)').in('product_id', productIds).eq('mode', 'simulation'),
+        supabase.from('product_prices').select('*').in('product_id', productIds).eq('mode', 'budget'),
+        supabase.from('recipes').select('*, ingredients(*)').in('product_id', productIds).eq('mode', 'budget'),
+        supabase.from('product_packaging').select('*, packaging(*)').in('product_id', productIds).eq('mode', 'budget'),
+        supabase.from('product_variable_costs').select('*, variable_costs(*)').in('product_id', productIds).eq('mode', 'budget'),
       ]);
 
       const prices = pricesRes.data || [];
@@ -574,7 +574,7 @@ export const useSalesReport = (year: number, mode: ReportMode = 'budget') => {
         .from('product_prices')
         .select('*')
         .in('product_id', allProductIds)
-        .eq('mode', 'simulation');
+        .eq('mode', 'budget');
 
       // Helper: get price for a product/category
       const getPrice = (productId: string, category: string): number => {

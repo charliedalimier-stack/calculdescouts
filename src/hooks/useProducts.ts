@@ -12,7 +12,7 @@ export interface Product {
   unite_vente: string;
   prix_btc: number;
   project_id: string;
-  mode: 'simulation' | 'reel';
+  mode: 'budget' | 'reel';
   tva_taux: number | null;
   created_at: string;
   updated_at: string;
@@ -41,17 +41,17 @@ export interface ProductInsert {
   unite_vente: string;
   prix_btc: number;
   project_id: string;
-  mode?: 'simulation' | 'reel';
+  mode?: 'budget' | 'reel';
   tva_taux?: number | null;
 }
 
 /**
  * Hook to manage products with optional mode parameter.
- * If mode is not provided, defaults to 'simulation' for backward compatibility.
+ * If mode is not provided, defaults to 'budget' for backward compatibility.
  * 
- * @param mode - Optional mode ('simulation' | 'reel'). Defaults to 'simulation'.
+ * @param mode - Optional mode ('budget' | 'reel'). Defaults to 'budget'.
  */
-export function useProducts(mode: 'simulation' | 'reel' = 'simulation') {
+export function useProducts(mode: 'budget' | 'reel' = 'budget') {
   const { currentProject } = useProject();
   const { settings } = useProjectSettings();
   const queryClient = useQueryClient();
@@ -148,7 +148,7 @@ export function useProducts(mode: 'simulation' | 'reel' = 'simulation') {
 
         return {
           ...product,
-          mode: product.mode as 'simulation' | 'reel',
+          mode: product.mode as 'budget' | 'reel',
           category_name: (product.categories as any)?.nom_categorie || null,
           cost_ingredients: ingredientCost,
           cost_packaging: packagingCost,

@@ -14,6 +14,7 @@ export interface Product {
   project_id: string;
   mode: 'budget' | 'reel';
   tva_taux: number | null;
+  yield_quantity: number; // Number of portions produced by this recipe
   created_at: string;
   updated_at: string;
 }
@@ -23,7 +24,8 @@ export interface ProductWithCosts extends Product {
   cost_ingredients: number;
   cost_packaging: number;
   cost_variable: number;
-  cost_total: number;
+  cost_total: number; // Total recipe cost
+  cost_per_portion: number; // Cost per portion = cost_total / yield_quantity
   prix_btb: number;
   prix_btb_ttc: number;
   prix_distributor: number;
@@ -43,6 +45,7 @@ export interface ProductInsert {
   project_id: string;
   mode?: 'budget' | 'reel';
   tva_taux?: number | null;
+  yield_quantity?: number; // Default: 1
 }
 
 /**
@@ -146,14 +149,20 @@ export function useProducts(mode: 'budget' | 'reel' = 'budget') {
             return sum + (Number(v.quantite) * Number(unitCost));
           }, 0);
 
+        const costTotal = ingredientCost + packagingCost + variableCost;
+        const yieldQty = product.yield_quantity ?? 1;
+        const costPerPortion = yieldQty > 0 ? costTotal / yieldQty : costTotal;
+
         return {
           ...product,
           mode: product.mode as 'budget' | 'reel',
+          yield_quantity: yieldQty,
           category_name: (product.categories as any)?.nom_categorie || null,
           cost_ingredients: ingredientCost,
           cost_packaging: packagingCost,
           cost_variable: variableCost,
-          cost_total: ingredientCost + packagingCost + variableCost,
+          cost_total: costTotal,
+          cost_per_portion: costPerPortion,
         };
       });
     },
@@ -171,7 +180,8 @@ export function useProducts(mode: 'budget' | 'reel' = 'budget') {
 
     return rawProductsData.map(product => {
       const prixBtc = Number(product.prix_btc);
-      const costTotal = product.cost_total;
+      // Use cost_per_portion for margin/coefficient calculations (sells per portion, not per batch)
+      const costPerPortion = product.cost_per_portion;
       const productTva = product.tva_taux ?? tvaVente;
       
       // Computed prices based on current settings (REACTIVE)
@@ -184,11 +194,11 @@ export function useProducts(mode: 'budget' | 'reel' = 'budget') {
       const prixBtbTtc = prixBtb * tvaMultiplier;
       const prixDistributorTtc = prixDistributor * tvaMultiplier;
       
-      // Margins (based on selling price)
-      const margin = prixBtc > 0 ? ((prixBtc - costTotal) / prixBtc) * 100 : 0;
-      const marginBtb = prixBtb > 0 ? ((prixBtb - costTotal) / prixBtb) * 100 : 0;
-      const marginDistributor = prixDistributor > 0 ? ((prixDistributor - costTotal) / prixDistributor) * 100 : 0;
-      const coefficient = costTotal > 0 ? prixBtc / costTotal : 0;
+      // Margins based on cost per portion (unit cost for sales)
+      const margin = prixBtc > 0 ? ((prixBtc - costPerPortion) / prixBtc) * 100 : 0;
+      const marginBtb = prixBtb > 0 ? ((prixBtb - costPerPortion) / prixBtb) * 100 : 0;
+      const marginDistributor = prixDistributor > 0 ? ((prixDistributor - costPerPortion) / prixDistributor) * 100 : 0;
+      const coefficient = costPerPortion > 0 ? prixBtc / costPerPortion : 0;
 
       return {
         ...product,

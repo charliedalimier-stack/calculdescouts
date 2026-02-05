@@ -628,6 +628,7 @@ export type Database = {
           tva_taux: number | null
           unite_vente: string
           updated_at: string
+          yield_quantity: number
         }
         Insert: {
           categorie_id?: string | null
@@ -640,6 +641,7 @@ export type Database = {
           tva_taux?: number | null
           unite_vente?: string
           updated_at?: string
+          yield_quantity?: number
         }
         Update: {
           categorie_id?: string | null
@@ -652,6 +654,7 @@ export type Database = {
           tva_taux?: number | null
           unite_vente?: string
           updated_at?: string
+          yield_quantity?: number
         }
         Relationships: [
           {

@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Link2, ChefHat } from "lucide-react";
+import { Link2, ChefHat, Layers } from "lucide-react";
 
 interface RecipeIngredient {
   ingredient_name: string;
@@ -17,6 +17,7 @@ interface RecipeCostBreakdownProps {
   totalVariableCost: number;
   totalCost: number;
   prixBTC: number;
+  yieldQuantity?: number; // Number of portions produced
 }
 
 export function RecipeCostBreakdown({
@@ -26,6 +27,7 @@ export function RecipeCostBreakdown({
   totalVariableCost,
   totalCost,
   prixBTC,
+  yieldQuantity = 1,
 }: RecipeCostBreakdownProps) {
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("fr-FR", {
@@ -33,8 +35,13 @@ export function RecipeCostBreakdown({
       currency: "EUR",
     }).format(value);
 
-  const margin = prixBTC > 0 ? ((prixBTC - totalCost) / prixBTC) * 100 : 0;
-  const coefficient = totalCost > 0 ? prixBTC / totalCost : 0;
+  // Calculate cost per portion
+  const effectiveYield = Math.max(1, yieldQuantity);
+  const costPerPortion = totalCost / effectiveYield;
+  
+  // Margin and coefficient based on cost per portion (unit cost)
+  const margin = prixBTC > 0 ? ((prixBTC - costPerPortion) / prixBTC) * 100 : 0;
+  const coefficient = costPerPortion > 0 ? prixBTC / costPerPortion : 0;
 
   const subRecipeIngredients = ingredients.filter((i) => i.is_sub_recipe);
   const regularIngredients = ingredients.filter((i) => !i.is_sub_recipe);
@@ -107,8 +114,26 @@ export function RecipeCostBreakdown({
             <span className="font-mono">{formatCurrency(totalVariableCost)}</span>
           </div>
           <div className="flex justify-between font-semibold border-t pt-2">
-            <span>Coût de revient total</span>
+            <span>Coût recette total</span>
             <span className="font-mono">{formatCurrency(totalCost)}</span>
+          </div>
+          
+          {/* Portion breakdown */}
+          {effectiveYield > 1 && (
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Layers className="h-3 w-3" />
+                Portions produites
+              </span>
+              <span className="font-mono">{effectiveYield}</span>
+            </div>
+          )}
+          <div className="flex justify-between font-bold text-primary border-t pt-2">
+            <span className="flex items-center gap-1">
+              <Layers className="h-4 w-4" />
+              Coût par portion
+            </span>
+            <span className="font-mono">{formatCurrency(costPerPortion)}</span>
           </div>
         </div>
 

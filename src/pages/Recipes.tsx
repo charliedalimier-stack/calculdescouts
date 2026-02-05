@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChefHat, Calculator, Package, Apple, Trash2, Link2 } from "lucide-react";
+import { ChefHat, Calculator, Package, Apple, Trash2, Link2, Layers, Edit2 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 import {
   Dialog,
   DialogContent,
@@ -51,6 +52,8 @@ const Recipes = () => {
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [isAddRecipeOpen, setIsAddRecipeOpen] = useState(false);
   const [isAddPackagingOpen, setIsAddPackagingOpen] = useState(false);
+  const [isEditYieldOpen, setIsEditYieldOpen] = useState(false);
+  const [editingYield, setEditingYield] = useState<number>(1);
   const [newRecipe, setNewRecipe] = useState({ product_id: '', ingredient_id: '', quantite_utilisee: 0 });
   const [newPackaging, setNewPackaging] = useState({ product_id: '', packaging_id: '', quantite: 1 });
 
@@ -64,6 +67,8 @@ const Recipes = () => {
     addProductPackaging,
     removeProductPackaging,
   } = useRecipes(selectedProductId || undefined);
+
+  const { updateProduct } = useProducts();
 
   const isLoading = isLoadingProducts;
   const selectedProduct = productsWithCosts.find(p => p.id === selectedProductId);
@@ -96,6 +101,26 @@ const Recipes = () => {
         setNewPackaging({ product_id: '', packaging_id: '', quantite: 1 });
       },
     });
+  };
+
+  const handleEditYield = () => {
+    if (!selectedProduct || editingYield < 1) return;
+    
+    updateProduct.mutate({
+      id: selectedProduct.id,
+      yield_quantity: editingYield,
+    }, {
+      onSuccess: () => {
+        setIsEditYieldOpen(false);
+      },
+    });
+  };
+
+  const openYieldEditor = () => {
+    if (selectedProduct) {
+      setEditingYield(selectedProduct.yield_quantity ?? 1);
+      setIsEditYieldOpen(true);
+    }
   };
 
   if (isLoading) {
@@ -294,10 +319,15 @@ const Recipes = () => {
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div className="rounded-lg border border-border bg-background p-3">
                       <div className="flex items-center gap-2 text-muted-foreground">
-                        <Calculator className="h-4 w-4" />
-                        <span>Coût total</span>
+                        <Layers className="h-4 w-4" />
+                        <span>Coût/portion</span>
                       </div>
-                      <p className="mt-1 text-lg font-semibold">{product.cost_total.toFixed(2)} €</p>
+                      <p className="mt-1 text-lg font-semibold">{product.cost_per_portion.toFixed(2)} €</p>
+                      {product.yield_quantity > 1 && (
+                        <p className="text-xs text-muted-foreground">
+                          {product.yield_quantity} portions
+                        </p>
+                      )}
                     </div>
                     <div className="rounded-lg border border-border bg-background p-3">
                       <div className="flex items-center gap-2 text-muted-foreground">
@@ -310,6 +340,9 @@ const Recipes = () => {
 
                   <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
                     <span>Coef: {product.coefficient.toFixed(2)}x</span>
+                    {product.yield_quantity > 1 && (
+                      <span>Recette: {product.cost_total.toFixed(2)} € pour {product.yield_quantity} portions</span>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -422,8 +455,24 @@ const Recipes = () => {
 
                 {/* Cost Summary */}
                 <div className="mt-6 rounded-lg border border-border bg-accent/50 p-4">
-                  <h4 className="mb-4 font-semibold">Récapitulatif des coûts</h4>
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h4 className="font-semibold">Récapitulatif des coûts</h4>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">
+                        Portions produites: <strong>{selectedProduct.yield_quantity}</strong>
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={openYieldEditor}
+                      >
+                        <Edit2 className="mr-1 h-3 w-3" />
+                        Modifier
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                     <div>
                       <p className="text-sm text-muted-foreground">Ingrédients</p>
                       <p className="text-lg font-semibold">{selectedProduct.cost_ingredients.toFixed(2)} €</p>
@@ -437,8 +486,21 @@ const Recipes = () => {
                       <p className="text-lg font-semibold">{selectedProduct.cost_variable.toFixed(2)} €</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Coût total</p>
+                      <p className="text-sm text-muted-foreground">Coût recette</p>
                       <p className="text-lg font-semibold">{selectedProduct.cost_total.toFixed(2)} €</p>
+                    </div>
+                    <div className="rounded-lg bg-primary/10 p-2">
+                      <p className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <Layers className="h-3 w-3" />
+                        Coût/portion
+                        <InfoTooltip 
+                          title="Coût par portion" 
+                          description="Coût unitaire utilisé pour calculer les marges et les coefficients."
+                          formula="Coût recette ÷ Nombre de portions"
+                          size="sm"
+                        />
+                      </p>
+                      <p className="text-lg font-bold text-primary">{selectedProduct.cost_per_portion.toFixed(2)} €</p>
                     </div>
                   </div>
 
@@ -457,6 +519,49 @@ const Recipes = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Yield Editor Dialog */}
+                <Dialog open={isEditYieldOpen} onOpenChange={setIsEditYieldOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Nombre de portions produites</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 pt-4">
+                      <p className="text-sm text-muted-foreground">
+                        Indiquez combien de portions (bocaux, unités, etc.) cette recette produit.
+                        Le coût par portion sera calculé automatiquement.
+                      </p>
+                      <div className="space-y-2">
+                        <Label>Nombre de portions</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={editingYield}
+                          onChange={(e) => setEditingYield(Math.max(1, parseInt(e.target.value) || 1))}
+                        />
+                      </div>
+                      <div className="rounded-lg bg-accent/50 p-3">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Coût total recette:</span>
+                          <span className="font-semibold">{selectedProduct.cost_total.toFixed(2)} €</span>
+                        </div>
+                        <div className="flex justify-between text-sm mt-2">
+                          <span className="text-muted-foreground">Coût par portion:</span>
+                          <span className="font-bold text-primary">
+                            {(selectedProduct.cost_total / editingYield).toFixed(2)} €
+                          </span>
+                        </div>
+                      </div>
+                      <Button 
+                        className="w-full" 
+                        onClick={handleEditYield} 
+                        disabled={updateProduct.isPending}
+                      >
+                        {updateProduct.isPending ? 'Enregistrement...' : 'Enregistrer'}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </CardContent>
             </Card>
           )}

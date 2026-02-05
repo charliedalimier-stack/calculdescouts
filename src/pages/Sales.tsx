@@ -31,9 +31,15 @@ const Sales = () => {
 
   const isLoading = loadingCoefs || loadingEntries || loadingMonthly;
 
-  // Summary KPIs
+  // Summary KPIs - Dynamically based on selected mode
   const budgetCa = monthlyTotals.budget_ca;
   const reelCa = monthlyTotals.reel_ca;
+  
+  // Primary CA depends on selected mode
+  const primaryCa = dataMode === 'budget' ? budgetCa : reelCa;
+  const primaryLabel = dataMode === 'budget' ? 'CA Budget' : 'CA Réel';
+  
+  // Variance is always: Réel - Budget
   const ecartCa = monthlyTotals.ecart_ca;
   const ecartPercent = monthlyTotals.ecart_percent;
 
@@ -98,32 +104,48 @@ const Sales = () => {
 
       {/* Summary Cards */}
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Primary CA Card - changes based on mode */}
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent">
-                <Target className="h-5 w-5 text-accent-foreground" />
+              <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+                dataMode === 'budget' ? 'bg-accent' : 'bg-primary/10'
+              }`}>
+                {dataMode === 'budget' ? (
+                  <Target className="h-5 w-5 text-accent-foreground" />
+                ) : (
+                  <BarChart3 className="h-5 w-5 text-primary" />
+                )}
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">CA Budget {selectedYear}</p>
+                <p className="text-sm text-muted-foreground">{primaryLabel} {selectedYear}</p>
                 <p className="text-xl font-bold">
-                  {budgetCa.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
+                  {primaryCa.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
                 </p>
               </div>
             </div>
           </CardContent>
         </Card>
 
+        {/* Reference CA Card - shows the other mode for comparison */}
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <BarChart3 className="h-5 w-5 text-primary" />
+              <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+                dataMode === 'budget' ? 'bg-primary/10' : 'bg-accent'
+              }`}>
+                {dataMode === 'budget' ? (
+                  <BarChart3 className="h-5 w-5 text-primary" />
+                ) : (
+                  <Target className="h-5 w-5 text-accent-foreground" />
+                )}
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">CA Réel {selectedYear}</p>
+                <p className="text-sm text-muted-foreground">
+                  {dataMode === 'budget' ? 'CA Réel' : 'CA Budget'} {selectedYear}
+                </p>
                 <p className="text-xl font-bold">
-                  {reelCa.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
+                  {(dataMode === 'budget' ? reelCa : budgetCa).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
                 </p>
               </div>
             </div>

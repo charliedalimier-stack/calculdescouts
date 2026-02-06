@@ -10,9 +10,12 @@ import {
   useAnnualSalesEntry, 
   useMonthlyDistribution 
 } from "@/hooks/useAnnualSalesEntry";
+import { useMonthlyReelEntry, useReelSeasonality, useReelAnnualTotals } from "@/hooks/useMonthlyReelEntry";
 import { AnnualEntryTable } from "@/components/sales/AnnualEntryTable";
 import { SeasonalityEditor } from "@/components/sales/SeasonalityEditor";
 import { MonthlyViewTable } from "@/components/sales/MonthlyViewTable";
+import { MonthlyReelEntryTable } from "@/components/sales/MonthlyReelEntryTable";
+import { ReelSeasonalityDisplay } from "@/components/sales/ReelSeasonalityDisplay";
 import { ObjectivesComparisonTable } from "@/components/sales/ObjectivesComparisonTable";
 import { SalesCharts } from "@/components/sales/SalesCharts";
 import { PeriodSelector, DataMode } from "@/components/layout/PeriodSelector";
@@ -23,13 +26,25 @@ const Sales = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('entry');
   const [dataMode, setDataMode] = useState<DataMode>('budget');
   const [selectedYear, setSelectedYear] = useState(getCurrentYear());
+  const [selectedReelMonth, setSelectedReelMonth] = useState(new Date().getMonth() + 1);
 
-  // Hooks with dynamic year and mode
+  // Budget hooks
   const { coefficients, isLoading: loadingCoefs, updateCoefficients } = useSeasonalityCoefficients(selectedYear, dataMode);
-  const { entries, totals: entryTotals, isLoading: loadingEntries, setAnnualSales } = useAnnualSalesEntry(selectedYear, dataMode);
+  const { entries: budgetEntries, totals: budgetTotals, isLoading: loadingBudgetEntries, setAnnualSales } = useAnnualSalesEntry(selectedYear, 'budget');
   const { monthly, byChannel, totals: monthlyTotals, isLoading: loadingMonthly } = useMonthlyDistribution(selectedYear);
 
-  const isLoading = loadingCoefs || loadingEntries || loadingMonthly;
+  // Reel hooks
+  const { 
+    entries: reelEntries, 
+    monthlyTotals: reelMonthlyTotals,
+    annualTotals: reelAnnualTotals,
+    isLoading: loadingReelEntries, 
+    setMonthlySales 
+  } = useMonthlyReelEntry(selectedYear, selectedReelMonth);
+  const { seasonality: reelSeasonality, totalCa: reelTotalCa, isLoading: loadingReelSeasonality } = useReelSeasonality(selectedYear);
+  const { totalCa: reelAnnualCa, isLoading: loadingReelTotals } = useReelAnnualTotals(selectedYear);
+
+  const isLoading = loadingCoefs || loadingBudgetEntries || loadingMonthly || loadingReelEntries;
 
   // Summary KPIs - Dynamically based on selected mode
   const budgetCa = monthlyTotals.budget_ca;
@@ -50,7 +65,7 @@ const Sales = () => {
     setDataMode(mode);
   };
 
-  if (isLoading && entries.length === 0) {
+  if (isLoading && budgetEntries.length === 0 && reelEntries.length === 0) {
     return (
       <AppLayout title="Ventes" subtitle="Saisie annuelle → Lecture mensuelle">
         <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -70,7 +85,10 @@ const Sales = () => {
   return (
     <AppLayout
       title="Ventes"
-      subtitle="Saisie annuelle → Lecture mensuelle"
+      subtitle={dataMode === 'budget' 
+        ? "Saisie annuelle → Lecture mensuelle" 
+        : "Saisie mensuelle des ventes réelles"
+      }
     >
       {/* Period Selector */}
       <div className="mb-6 flex flex-wrap items-center gap-4">
@@ -202,19 +220,41 @@ const Sales = () => {
         {/* Entry View */}
         {viewMode === 'entry' && (
           <>
-            <SeasonalityEditor
-              coefficients={coefficients}
-              mode={dataMode}
-              onUpdate={(c) => updateCoefficients.mutate(c)}
-              isLoading={loadingCoefs}
-            />
-            <AnnualEntryTable
-              entries={entries}
-              totals={entryTotals}
-              isLoading={loadingEntries}
-              mode={dataMode}
-              onUpdate={(params) => setAnnualSales.mutate(params)}
-            />
+            {dataMode === 'budget' ? (
+              // BUDGET: Annual entry with seasonality coefficients
+              <>
+                <SeasonalityEditor
+                  coefficients={coefficients}
+                  mode={dataMode}
+                  onUpdate={(c) => updateCoefficients.mutate(c)}
+                  isLoading={loadingCoefs}
+                />
+                <AnnualEntryTable
+                  entries={budgetEntries}
+                  totals={budgetTotals}
+                  isLoading={loadingBudgetEntries}
+                  mode={dataMode}
+                  onUpdate={(params) => setAnnualSales.mutate(params)}
+                />
+              </>
+            ) : (
+              // REEL: Monthly entry
+              <>
+                <ReelSeasonalityDisplay
+                  seasonality={reelSeasonality}
+                  totalCa={reelTotalCa}
+                  isLoading={loadingReelSeasonality}
+                />
+                <MonthlyReelEntryTable
+                  entries={reelEntries}
+                  totals={reelMonthlyTotals}
+                  isLoading={loadingReelEntries}
+                  selectedMonth={selectedReelMonth}
+                  onMonthChange={setSelectedReelMonth}
+                  onUpdate={(params) => setMonthlySales.mutate(params)}
+                />
+              </>
+            )}
           </>
         )}
 

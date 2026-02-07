@@ -263,6 +263,53 @@ export type Database = {
           },
         ]
       }
+      financings: {
+        Row: {
+          created_at: string
+          date_debut: string
+          duree_mois: number
+          id: string
+          mode: string
+          montant: number
+          project_id: string
+          taux_interet: number
+          type_financement: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date_debut?: string
+          duree_mois?: number
+          id?: string
+          mode?: string
+          montant?: number
+          project_id: string
+          taux_interet?: number
+          type_financement?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date_debut?: string
+          duree_mois?: number
+          id?: string
+          mode?: string
+          montant?: number
+          project_id?: string
+          taux_interet?: number
+          type_financement?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financings_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ingredients: {
         Row: {
           cout_unitaire: number
@@ -319,6 +366,56 @@ export type Database = {
             columns: ["source_product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      investments: {
+        Row: {
+          categorie: string
+          created_at: string
+          date_achat: string
+          duree_amortissement: number
+          id: string
+          mode: string
+          montant_ht: number
+          nom: string
+          project_id: string
+          tva_taux: number
+          updated_at: string
+        }
+        Insert: {
+          categorie?: string
+          created_at?: string
+          date_achat?: string
+          duree_amortissement?: number
+          id?: string
+          mode?: string
+          montant_ht?: number
+          nom: string
+          project_id: string
+          tva_taux?: number
+          updated_at?: string
+        }
+        Update: {
+          categorie?: string
+          created_at?: string
+          date_achat?: string
+          duree_amortissement?: number
+          id?: string
+          mode?: string
+          montant_ht?: number
+          nom?: string
+          project_id?: string
+          tva_taux?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]

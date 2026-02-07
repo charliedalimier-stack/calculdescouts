@@ -24,6 +24,7 @@ import {
   User,
   
   FileSpreadsheet,
+  Landmark,
 } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,7 @@ const productionNavItems = [
 const financialAnalysisNavItems = [
   { title: "Ventes", icon: TrendingUp, path: "/sales" },
   { title: "Frais professionnels", icon: Briefcase, path: "/expenses" },
+  { title: "Investissements", icon: Landmark, path: "/investments" },
   { title: "Cash-flow", icon: Wallet, path: "/cashflow" },
   { title: "TVA", icon: Receipt, path: "/tva" },
 ];

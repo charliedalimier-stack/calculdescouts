@@ -29,6 +29,7 @@ import Expenses from "./pages/Expenses";
 import Settings from "./pages/Settings";
 
 import Reports from "./pages/Reports";
+import Investments from "./pages/Investments";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -65,6 +66,7 @@ const App = () => (
                 <Route path="/tva" element={<ProtectedRoute><TVA /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+                <Route path="/investments" element={<ProtectedRoute><Investments /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>

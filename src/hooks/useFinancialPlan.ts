@@ -242,24 +242,73 @@ export function useFinancialPlan(baseYear: number, fiscalParams: FiscalParams) {
           const yearStart = `${year}-01-01`;
           const yearEnd = `${year}-12-31`;
           
-          const { data: expenses } = await supabase
-            .from('professional_expenses')
-            .select('*')
-            .eq('project_id', currentProject.id)
-            .eq('mode', dbMode)
-            .gte('mois', yearStart)
-            .lte('mois', yearEnd);
+          const [expensesRes, investmentsRes] = await Promise.all([
+            supabase
+              .from('professional_expenses')
+              .select('*')
+              .eq('project_id', currentProject.id)
+              .eq('mode', dbMode)
+              .gte('mois', yearStart)
+              .lte('mois', yearEnd),
+            supabase
+              .from('investments')
+              .select('*')
+              .eq('project_id', currentProject.id)
+              .eq('mode', dbMode),
+          ]);
+
+          const expenses = expensesRes.data || [];
+          const investmentsList = investmentsRes.data || [];
 
           // Calculate expenses by category
           const chargesByCategory: { [key: string]: number } = {};
           let totalCharges = 0;
 
-          (expenses || []).forEach(expense => {
+          expenses.forEach(expense => {
             const montantHt = Number(expense.montant_ht) || 0;
             chargesByCategory[expense.categorie_frais] = 
               (chargesByCategory[expense.categorie_frais] || 0) + montantHt;
             totalCharges += montantHt;
           });
+
+          // Calculate depreciation from investments (amortissements)
+          // Only investments whose depreciation period covers this year
+          let totalAmortissements = 0;
+          investmentsList.forEach(inv => {
+            const duree = Number(inv.duree_amortissement);
+            if (duree <= 0) return; // Non-amortissable
+            
+            const dateAchat = new Date(inv.date_achat);
+            const startYear = dateAchat.getFullYear();
+            const startMonth = dateAchat.getMonth(); // 0-indexed
+            const endDate = new Date(startYear + duree, startMonth, 1);
+            
+            // Check if this year falls within depreciation period
+            if (year < startYear || year >= endDate.getFullYear()) return;
+            // Edge case: end year but before end month
+            if (year === endDate.getFullYear() && 0 >= endDate.getMonth()) return;
+            
+            const dotationAnnuelle = Number(inv.montant_ht) / duree;
+            
+            // Pro-rata for first and last year
+            if (year === startYear) {
+              // Pro-rata: remaining months in first year
+              const monthsRemaining = 12 - startMonth;
+              totalAmortissements += dotationAnnuelle * (monthsRemaining / 12);
+            } else if (year === endDate.getFullYear() - 1 && endDate.getMonth() < 12) {
+              // Last partial year if end date is mid-year
+              // endDate month is the stop month
+              totalAmortissements += dotationAnnuelle;
+            } else {
+              totalAmortissements += dotationAnnuelle;
+            }
+          });
+
+          if (totalAmortissements > 0) {
+            chargesByCategory['amortissements'] = 
+              (chargesByCategory['amortissements'] || 0) + totalAmortissements;
+            totalCharges += totalAmortissements;
+          }
 
           // Calculate derived values
           const coefficient = achatsMarchandises > 0 ? caTotal / achatsMarchandises : 0;

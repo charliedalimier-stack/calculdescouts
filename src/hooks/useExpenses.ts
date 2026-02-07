@@ -44,6 +44,7 @@ export const EXPENSE_CATEGORIES = [
   { value: 'energie', label: 'Énergie' },
   { value: 'entretien', label: 'Entretien' },
   { value: 'formation', label: 'Formation' },
+  { value: 'amortissements', label: 'Amortissements' },
   { value: 'autres', label: 'Autres' },
 ];
 

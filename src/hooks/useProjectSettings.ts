@@ -37,6 +37,9 @@ export interface ProjectSettings {
   delai_paiement_btc: number;
   delai_paiement_btb: number;
   delai_paiement_distributeur: number;
+  // Financial objectives
+  seuil_viabilite: number;
+  revenu_ideal: number;
   created_at: string;
   updated_at: string;
 }
@@ -78,6 +81,9 @@ const defaultSettings: Omit<ProjectSettings, 'id' | 'project_id' | 'created_at' 
   delai_paiement_btc: 0,
   delai_paiement_btb: 30,
   delai_paiement_distributeur: 30,
+  // Financial objectives
+  seuil_viabilite: 0,
+  revenu_ideal: 0,
 };
 
 export function useProjectSettings() {

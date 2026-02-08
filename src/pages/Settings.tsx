@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useProjectSettings } from "@/hooks/useProjectSettings";
 import { useProject } from "@/contexts/ProjectContext";
-import { Percent, TrendingUp } from "lucide-react";
+import { Percent, TrendingUp, Target } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FiscalSettingsCard } from "@/components/settings/FiscalSettingsCard";
@@ -43,6 +43,8 @@ const SettingsPage = () => {
     nombre_enfants_charge: 0,
     quotite_exemptee_base: 10570,
     majoration_par_enfant: 1850,
+    seuil_viabilite: 0,
+    revenu_ideal: 0,
   });
 
   useEffect(() => {
@@ -73,6 +75,8 @@ const SettingsPage = () => {
         nombre_enfants_charge: settings.nombre_enfants_charge,
         quotite_exemptee_base: settings.quotite_exemptee_base,
         majoration_par_enfant: settings.majoration_par_enfant,
+        seuil_viabilite: (settings as any).seuil_viabilite ?? 0,
+        revenu_ideal: (settings as any).revenu_ideal ?? 0,
       });
     }
   }, [settings]);
@@ -247,6 +251,47 @@ const SettingsPage = () => {
           formData={formData}
           onChange={handleChange}
         />
+
+        {/* Objectifs financiers */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Target className="h-5 w-5 text-primary" />
+              Objectifs financiers
+            </CardTitle>
+            <CardDescription>
+              Définissez vos objectifs de chiffre d'affaires annuel HTVA pour les simulations
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="seuil_viabilite">Seuil de viabilité (€ HTVA / an)</Label>
+              <Input
+                id="seuil_viabilite"
+                type="number"
+                step="100"
+                value={formData.seuil_viabilite}
+                onChange={(e) => handleChange('seuil_viabilite', e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                CA minimum pour couvrir vos besoins personnels
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="revenu_ideal">Revenu idéal (€ HTVA / an)</Label>
+              <Input
+                id="revenu_ideal"
+                type="number"
+                step="100"
+                value={formData.revenu_ideal}
+                onChange={(e) => handleChange('revenu_ideal', e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                CA cible pour atteindre votre objectif de rémunération
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="mt-6 flex justify-end">

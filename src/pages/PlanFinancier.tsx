@@ -16,6 +16,8 @@ import { useProjectSettings } from "@/hooks/useProjectSettings";
 import { useTaxBrackets } from "@/hooks/useTaxBrackets";
 import { EXPENSE_CATEGORIES } from "@/hooks/useExpenses";
 import { FinancialStressTest } from "@/components/financial/FinancialStressTest";
+import { useFinancialSimulation } from "@/hooks/useFinancialSimulation";
+import { FinancialSimulationTable } from "@/components/financial/FinancialSimulationTable";
 
 interface FinancialPlanRow {
   key: string;
@@ -152,6 +154,14 @@ const PlanFinancier = () => {
   };
 
   const { data: planData, isLoading } = useFinancialPlan(selectedYear, fiscalParams);
+
+  // Financial simulation
+  const { scenarios } = useFinancialSimulation(
+    planData?.yearN.budget,
+    fiscalParams,
+    settings?.seuil_viabilite ?? 0,
+    settings?.revenu_ideal ?? 0,
+  );
 
   const handlePeriodChange = (params: { month?: number; year: number; mode: DataMode }) => {
     setSelectedYear(params.year);
@@ -291,6 +301,11 @@ const PlanFinancier = () => {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Simulation des niveaux de CA */}
+        {planData && scenarios.length > 0 && (
+          <FinancialSimulationTable scenarios={scenarios} />
         )}
 
         {/* Stress Test Section */}

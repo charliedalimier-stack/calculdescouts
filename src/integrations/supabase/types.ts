@@ -899,7 +899,9 @@ export type Database = {
           project_id: string
           quotite_exemptee_base: number
           regime_tva: string
+          revenu_ideal: number
           seuil_stock_alerte: number
+          seuil_viabilite: number
           taux_communal: number
           taux_cotisations_sociales: number
           tva_achat: number
@@ -931,7 +933,9 @@ export type Database = {
           project_id: string
           quotite_exemptee_base?: number
           regime_tva?: string
+          revenu_ideal?: number
           seuil_stock_alerte?: number
+          seuil_viabilite?: number
           taux_communal?: number
           taux_cotisations_sociales?: number
           tva_achat?: number
@@ -963,7 +967,9 @@ export type Database = {
           project_id?: string
           quotite_exemptee_base?: number
           regime_tva?: string
+          revenu_ideal?: number
           seuil_stock_alerte?: number
+          seuil_viabilite?: number
           taux_communal?: number
           taux_cotisations_sociales?: number
           tva_achat?: number

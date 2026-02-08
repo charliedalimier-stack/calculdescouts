@@ -25,7 +25,7 @@ import {
   Bar,
   Legend,
 } from "recharts";
-import { Wallet, TrendingUp, TrendingDown, AlertTriangle, Receipt, Package, Boxes, Zap, FileText, Info, Store, Building2, Truck, Clock } from "lucide-react";
+import { Wallet, TrendingUp, TrendingDown, AlertTriangle, Receipt, Package, Boxes, Zap, FileText, Info, Store, Building2, Truck, Clock, Landmark, CreditCard } from "lucide-react";
 import { useAutoCashFlow, CashFlowMode } from "@/hooks/useAutoCashFlow";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { DEFINITIONS } from "@/lib/pedagogicDefinitions";
@@ -411,6 +411,46 @@ const CashFlow = () => {
         </Card>
       </div>
 
+      {/* Investment & Financing Summary */}
+      {(summary.total_investissements > 0 || summary.total_financements > 0) && (
+        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Landmark className="h-4 w-4 text-destructive" />
+                <p className="text-xs text-muted-foreground">Investissements</p>
+              </div>
+              <p className="text-lg font-semibold text-destructive">-{formatCurrency(summary.total_investissements)}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <CreditCard className="h-4 w-4 text-primary" />
+                <p className="text-xs text-muted-foreground">Financements reçus</p>
+              </div>
+              <p className="text-lg font-semibold text-primary">+{formatCurrency(summary.total_financements)}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground mb-1">Remboursements prêts</p>
+              <p className="text-lg font-semibold text-destructive">
+                {summary.total_remboursements > 0 ? `-${formatCurrency(summary.total_remboursements)}` : '0 €'}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground mb-1">Intérêts payés</p>
+              <p className="text-lg font-semibold text-destructive">
+                {summary.total_interets > 0 ? `-${formatCurrency(summary.total_interets)}` : '0 €'}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Chart - Treasury Evolution */}
       {hasData && (
         <Card className="mb-8">
@@ -563,20 +603,32 @@ const CashFlow = () => {
                       <Zap className="h-4 w-4" /> Var.
                     </span>
                   </TableHead>
-                  <TableHead className="text-right">
-                    <span className="flex items-center justify-end gap-1">
-                      <Receipt className="h-4 w-4" /> Frais
-                    </span>
-                  </TableHead>
-                  {!isFranchise && (
-                    <>
-                      <TableHead className="text-right text-chart-2">TVA déd.</TableHead>
-                      <TableHead className="text-right text-chart-2">TVA nette</TableHead>
-                    </>
-                  )}
-                  <TableHead className="text-right">Var. trés.</TableHead>
-                  <TableHead className="text-right">Cumul</TableHead>
-                </TableRow>
+                   <TableHead className="text-right">
+                     <span className="flex items-center justify-end gap-1">
+                       <Receipt className="h-4 w-4" /> Frais
+                     </span>
+                   </TableHead>
+                   <TableHead className="text-right">
+                     <span className="flex items-center justify-end gap-1">
+                       <Landmark className="h-4 w-4" /> Invest.
+                     </span>
+                   </TableHead>
+                   <TableHead className="text-right">
+                     <span className="flex items-center justify-end gap-1">
+                       <CreditCard className="h-4 w-4" /> Financ.
+                     </span>
+                   </TableHead>
+                   <TableHead className="text-right">Rembours.</TableHead>
+                   <TableHead className="text-right">Intérêts</TableHead>
+                   {!isFranchise && (
+                     <>
+                       <TableHead className="text-right text-chart-2">TVA déd.</TableHead>
+                       <TableHead className="text-right text-chart-2">TVA nette</TableHead>
+                     </>
+                   )}
+                   <TableHead className="text-right">Var. trés.</TableHead>
+                   <TableHead className="text-right">Cumul</TableHead>
+                 </TableRow>
               </TableHeader>
               <TableBody>
                 {monthlyData.map((row) => (
@@ -601,6 +653,18 @@ const CashFlow = () => {
                     </TableCell>
                     <TableCell className="text-right text-chart-5">
                       {row.frais_professionnels_ht > 0 ? `-${formatCurrency(row.frais_professionnels_ht)}` : '-'}
+                    </TableCell>
+                    <TableCell className="text-right text-destructive">
+                      {row.investissements_sortie > 0 ? `-${formatCurrency(row.investissements_sortie)}` : '-'}
+                    </TableCell>
+                    <TableCell className="text-right text-primary">
+                      {row.financements_entree > 0 ? `+${formatCurrency(row.financements_entree)}` : '-'}
+                    </TableCell>
+                    <TableCell className="text-right text-destructive">
+                      {row.remboursements_pret > 0 ? `-${formatCurrency(row.remboursements_pret)}` : '-'}
+                    </TableCell>
+                    <TableCell className="text-right text-destructive">
+                      {row.interets_pret > 0 ? `-${formatCurrency(row.interets_pret)}` : '-'}
                     </TableCell>
                     {!isFranchise && (
                       <>
@@ -644,6 +708,18 @@ const CashFlow = () => {
                   </TableCell>
                   <TableCell className="text-right text-chart-5">
                     -{formatCurrency(summary.total_frais_professionnels_ht)}
+                  </TableCell>
+                  <TableCell className="text-right text-destructive">
+                    {summary.total_investissements > 0 ? `-${formatCurrency(summary.total_investissements)}` : '-'}
+                  </TableCell>
+                  <TableCell className="text-right text-primary">
+                    {summary.total_financements > 0 ? `+${formatCurrency(summary.total_financements)}` : '-'}
+                  </TableCell>
+                  <TableCell className="text-right text-destructive">
+                    {summary.total_remboursements > 0 ? `-${formatCurrency(summary.total_remboursements)}` : '-'}
+                  </TableCell>
+                  <TableCell className="text-right text-destructive">
+                    {summary.total_interets > 0 ? `-${formatCurrency(summary.total_interets)}` : '-'}
                   </TableCell>
                   {!isFranchise && (
                     <>

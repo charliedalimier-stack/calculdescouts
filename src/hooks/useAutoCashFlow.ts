@@ -36,6 +36,12 @@ export interface MonthlyCashFlowData {
   frais_professionnels_ttc: number;
   // TVA nette
   tva_nette: number;
+  // Investissements & Financements
+  investissements_sortie: number;
+  investissements_tva: number;
+  financements_entree: number;
+  remboursements_pret: number;
+  interets_pret: number;
   // Soldes calculés (HT - pour analyse économique)
   solde_production: number;
   solde_apres_frais: number;
@@ -179,6 +185,82 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
         .eq('mode', expenseMode)
         .gte('mois', startOfYear)
         .lte('mois', endOfYear);
+
+      // 6. Fetch investments and financings
+      const [investmentsRes, financingsRes] = await Promise.all([
+        supabase.from('investments').select('*').eq('project_id', currentProject.id).eq('mode', mode),
+        supabase.from('financings').select('*').eq('project_id', currentProject.id).eq('mode', mode),
+      ]);
+      const investmentsList = investmentsRes.data || [];
+      const financingsList = financingsRes.data || [];
+      // Pre-calculate investment & financing flows per month
+      const investFlowsByMonth: Array<{
+        investissements_sortie: number;
+        investissements_tva: number;
+        financements_entree: number;
+        remboursements_pret: number;
+        interets_pret: number;
+      }> = Array(12).fill(null).map(() => ({
+        investissements_sortie: 0, investissements_tva: 0,
+        financements_entree: 0, remboursements_pret: 0, interets_pret: 0,
+      }));
+
+      // Investment outflows at purchase date
+      investmentsList.forEach(inv => {
+        const dateAchat = new Date(inv.date_achat);
+        if (dateAchat.getFullYear() !== year) return;
+        const monthIdx = dateAchat.getMonth();
+        const montantHt = Number(inv.montant_ht);
+        const tvaTaux = Number(inv.tva_taux);
+        investFlowsByMonth[monthIdx].investissements_sortie += montantHt;
+        investFlowsByMonth[monthIdx].investissements_tva += isFranchise ? 0 : montantHt * (tvaTaux / 100);
+      });
+
+      // Financing inflows at start date + loan repayments
+      financingsList.forEach(fin => {
+        const dateDebut = new Date(fin.date_debut);
+        // Financing inflow
+        if (dateDebut.getFullYear() === year) {
+          const monthIdx = dateDebut.getMonth();
+          investFlowsByMonth[monthIdx].financements_entree += Number(fin.montant);
+        }
+        // Loan repayments (prêt or leasing) - monthly installments
+        if (fin.type_financement === 'pret' || fin.type_financement === 'leasing') {
+          const montant = Number(fin.montant);
+          const dureeMois = Number(fin.duree_mois) || 1;
+          const tauxAnnuel = Number(fin.taux_interet) / 100;
+          const tauxMensuel = tauxAnnuel / 12;
+          
+          // Monthly payment (annuity formula)
+          let mensualite: number;
+          if (tauxMensuel > 0) {
+            mensualite = montant * tauxMensuel / (1 - Math.pow(1 + tauxMensuel, -dureeMois));
+          } else {
+            mensualite = montant / dureeMois;
+          }
+
+          // Iterate months of this year that fall within the loan period
+          for (let m = 0; m < 12; m++) {
+            const currentMonthDate = new Date(year, m, 1);
+            if (currentMonthDate < dateDebut) continue;
+            // Calculate month offset from start
+            const monthOffset = (year - dateDebut.getFullYear()) * 12 + m - dateDebut.getMonth();
+            if (monthOffset >= dureeMois) continue;
+            
+            // Interest for this month (on remaining principal)
+            let remainingPrincipal = montant;
+            for (let k = 0; k < monthOffset; k++) {
+              const interetK = remainingPrincipal * tauxMensuel;
+              remainingPrincipal -= (mensualite - interetK);
+            }
+            const interetMois = remainingPrincipal * tauxMensuel;
+            const capitalMois = mensualite - interetMois;
+            
+            investFlowsByMonth[m].remboursements_pret += capitalMois;
+            investFlowsByMonth[m].interets_pret += interetMois;
+          }
+        }
+      });
 
       // Helper functions
       const getPrice = (productId: string, category: string): number => {
@@ -403,14 +485,34 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
         const encaissements_ttc = encaissements_ht + tva_collectee;
         const decaissements_production_ttc = decaissements_production_ht + (tva_deductible_matieres + tva_deductible_emballages + tva_deductible_variables);
         const frais_professionnels_ttc = frais_professionnels_ht + tva_deductible_frais;
-        const tva_nette = tva_collectee - tva_deductible;
+
+        // Investment & financing flows for this month
+        const invFlows = investFlowsByMonth[i];
+        const investissements_sortie = invFlows.investissements_sortie;
+        const investissements_tva = invFlows.investissements_tva;
+        const financements_entree = invFlows.financements_entree;
+        const remboursements_pret = invFlows.remboursements_pret;
+        const interets_pret = invFlows.interets_pret;
+
+        // TVA déductible on investments
+        const tva_deductible_invest = isFranchise ? 0 : investissements_tva;
+        const tva_deductible_total = tva_deductible + tva_deductible_invest;
+        const tva_nette = tva_collectee - tva_deductible_total;
 
         // Soldes économiques (HT) - based on encaissements (cash), not CA
         const solde_production = encaissements_ht - decaissements_production_ht;
         const solde_apres_frais = solde_production - frais_professionnels_ht;
 
-        // Variation trésorerie (TTC - inclut la TVA)
-        const variation_tresorerie = encaissements_ttc - decaissements_production_ttc - frais_professionnels_ttc - tva_nette;
+        // Variation trésorerie (TTC - inclut TVA, investissements, financements, prêts)
+        const variation_tresorerie = 
+          encaissements_ttc 
+          - decaissements_production_ttc 
+          - frais_professionnels_ttc 
+          - (investissements_sortie + investissements_tva)  // sortie investissement TTC
+          + financements_entree                              // entrée financement
+          - remboursements_pret                              // remboursement capital
+          - interets_pret                                    // intérêts
+          - tva_nette;
 
         cumul += variation_tresorerie;
 
@@ -432,11 +534,16 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
           tva_deductible_emballages,
           tva_deductible_variables,
           tva_deductible_frais,
-          tva_deductible,
+          tva_deductible: tva_deductible_total,
           decaissements_production_ttc,
           frais_professionnels_ht,
           frais_professionnels_ttc,
           tva_nette,
+          investissements_sortie,
+          investissements_tva,
+          financements_entree,
+          remboursements_pret,
+          interets_pret,
           solde_production,
           solde_apres_frais,
           variation_tresorerie,
@@ -463,6 +570,10 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
     total_frais_professionnels_ht: data?.reduce((sum, m) => sum + m.frais_professionnels_ht, 0) || 0,
     total_tva_nette: data?.reduce((sum, m) => sum + m.tva_nette, 0) || 0,
     total_variation_tresorerie: data?.reduce((sum, m) => sum + m.variation_tresorerie, 0) || 0,
+    total_investissements: data?.reduce((sum, m) => sum + m.investissements_sortie, 0) || 0,
+    total_financements: data?.reduce((sum, m) => sum + m.financements_entree, 0) || 0,
+    total_remboursements: data?.reduce((sum, m) => sum + m.remboursements_pret, 0) || 0,
+    total_interets: data?.reduce((sum, m) => sum + m.interets_pret, 0) || 0,
     solde_final: data?.[data.length - 1]?.cumul || 0,
     has_negative: data?.some(m => m.cumul < 0) || false,
     first_negative_month: data?.find(m => m.cumul < 0)?.monthLabel || null,
@@ -482,6 +593,11 @@ export function useAutoCashFlow({ mode, year }: UseAutoCashFlowOptions) {
     tva_deductible: 0,
     frais_professionnels_ht: 0,
     tva_nette: 0,
+    investissements_sortie: 0,
+    investissements_tva: 0,
+    financements_entree: 0,
+    remboursements_pret: 0,
+    interets_pret: 0,
     solde_production: 0,
     solde_apres_frais: 0,
     variation_tresorerie: 0,

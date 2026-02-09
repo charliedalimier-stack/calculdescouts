@@ -39,17 +39,14 @@ export function PeriodSelector({
   onChange,
 }: PeriodSelectorProps) {
   const handleYearChange = (newYear: string) => {
-    console.log('[PeriodSelector] Year changed:', newYear);
     onChange({ month, year: parseInt(newYear), mode });
   };
 
   const handleMonthChange = (newMonth: string) => {
-    console.log('[PeriodSelector] Month changed:', newMonth);
     onChange({ month: parseInt(newMonth), year, mode });
   };
 
   const handleModeChange = (newMode: string) => {
-    console.log('[PeriodSelector] Mode changed:', newMode);
     onChange({ month, year, mode: newMode as DataMode });
   };
 

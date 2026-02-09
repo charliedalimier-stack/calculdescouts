@@ -14,7 +14,7 @@ const ModeContext = createContext<ModeContextType | undefined>(undefined);
 export function ModeProvider({ children }: { children: ReactNode }) {
   const [mode, setMode] = useState<AppMode>('budget');
 
-  console.log('[ModeContext] Current mode:', mode);
+  
 
   return (
     <ModeContext.Provider

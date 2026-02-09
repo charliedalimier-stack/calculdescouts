@@ -101,10 +101,6 @@ const getVariationBadge = (current: number, previous: number) => {
   return null;
 };
 
-// Convert DataMode directly to 'budget' | 'reel' (no longer using 'simulation')
-const mapDataModeToProductMode = (mode: DataMode): 'budget' | 'reel' => {
-  return mode;
-};
 
 const Global = () => {
   const [periodType, setPeriodType] = useState<PeriodType>('month');
@@ -112,17 +108,12 @@ const Global = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [dataMode, setDataMode] = useState<DataMode>('budget');
 
-  // Convert DataMode to the mode expected by hooks
-  const productMode = mapDataModeToProductMode(dataMode);
-
-  // Log current mode for debugging
-  console.log('[Global] Current dataMode:', dataMode, '-> productMode:', productMode);
 
   const { data: synthesis, isLoading } = useGlobalSynthesis({
     periodType,
     year: selectedYear,
     month: periodType === 'month' ? selectedMonth : undefined,
-    mode: productMode,
+    mode: dataMode,
   });
 
   const periodLabel = periodType === 'month' 
@@ -131,7 +122,6 @@ const Global = () => {
 
   // Period change handler
   const handlePeriodChange = ({ month, year, mode }: { month?: number; year: number; mode: DataMode }) => {
-    console.log('[Global] Period changed:', { month, year, mode });
     if (month !== undefined) setSelectedMonth(month);
     setSelectedYear(year);
     setDataMode(mode);

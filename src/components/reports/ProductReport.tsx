@@ -61,8 +61,6 @@ const getCoefficientBadge = (coef: number) => {
 export function ProductReport({ year, mode }: ProductReportProps) {
   const { data: productData, isLoading } = useProductReport(year, mode);
 
-  // DEBUG: Log parameters and data
-  console.log('[ProductReport] year:', year, 'mode:', mode, 'dataCount:', productData?.length);
 
   if (isLoading) {
     return <div className="flex items-center justify-center p-8">Chargement...</div>;

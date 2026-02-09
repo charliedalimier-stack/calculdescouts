@@ -44,7 +44,7 @@ export function ProductAlerts({ mode = 'budget' }: ProductAlertsProps) {
   const { productsWithCosts, isLoadingWithCosts } = useProducts(mode);
   const { settings, isLoading: isLoadingSettings } = useProjectSettings();
 
-  console.log('[ProductAlerts] mode:', mode, 'products:', productsWithCosts?.length);
+  
 
   const isLoading = isLoadingWithCosts || isLoadingSettings;
 

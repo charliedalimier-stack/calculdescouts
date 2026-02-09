@@ -72,7 +72,7 @@ export function useMonthlyReelEntry(year: number, selectedMonth?: number) {
     queryFn: async () => {
       if (!currentProject?.id) return { entries: [], products: [], byProduct: [] };
 
-      console.log('[useMonthlyReelEntry] Fetching data for year:', year, 'month:', selectedMonth);
+      
 
       // Fetch products (budget mode = canonical)
       const { data: products, error: productsError } = await supabase
@@ -316,7 +316,7 @@ export function useReelSeasonality(year: number) {
     queryFn: async () => {
       if (!currentProject?.id) return { seasonality: [], totalCa: 0 };
 
-      console.log('[useReelSeasonality] Calculating real seasonality for year:', year);
+      
 
       // Fetch products for price lookup
       const { data: products } = await supabase

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,19 +18,8 @@ export default function Reports() {
   const [dataMode, setDataMode] = useState<DataMode>("budget");
   const { currentProject } = useProject();
 
-  // ========== DIAGNOSTIC LOGS ==========
-  useEffect(() => {
-    console.log("========== REPORTS DIAGNOSTIC ==========");
-    console.log("REPORTS YEAR:", selectedYear);
-    console.log("REPORTS MODE:", dataMode);
-    console.log("REPORTS PROJECT:", currentProject?.id);
-    console.log("REPORTS PROJECT NAME:", currentProject?.nom_projet);
-    console.log("=========================================");
-  }, [selectedYear, dataMode, currentProject]);
-  // ========== END DIAGNOSTIC LOGS ==========
 
   const handlePeriodChange = ({ year, mode }: { year: number; mode: DataMode }) => {
-    console.log("[Reports] handlePeriodChange called:", { year, mode });
     setSelectedYear(year);
     setDataMode(mode);
   };
@@ -116,7 +105,6 @@ export default function Reports() {
                 </CardDescription>
               </CardHeader>
             </Card>
-            {/* DEBUG: Props passed → year={selectedYear}, mode={dataMode} */}
             <FinancialReport year={selectedYear} mode={dataMode} />
           </TabsContent>
 
@@ -132,7 +120,6 @@ export default function Reports() {
                 </CardDescription>
               </CardHeader>
             </Card>
-            {/* DEBUG: Props passed → year={selectedYear}, mode={dataMode} */}
             <ProductReport year={selectedYear} mode={dataMode} />
           </TabsContent>
 
@@ -148,7 +135,6 @@ export default function Reports() {
                 </CardDescription>
               </CardHeader>
             </Card>
-            {/* DEBUG: Props passed → year={selectedYear}, mode={dataMode} */}
             <SalesReport year={selectedYear} mode={dataMode} />
           </TabsContent>
 
@@ -164,7 +150,6 @@ export default function Reports() {
                 </CardDescription>
               </CardHeader>
             </Card>
-            {/* DEBUG: Props passed → mode={dataMode} */}
             <StockReport mode={dataMode} />
           </TabsContent>
         </Tabs>

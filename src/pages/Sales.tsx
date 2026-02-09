@@ -60,7 +60,6 @@ const Sales = () => {
 
   // Period change handler
   const handlePeriodChange = ({ year, mode }: { month?: number; year: number; mode: DataMode }) => {
-    console.log('[Sales] Period changed:', { year, mode });
     setSelectedYear(year);
     setDataMode(mode);
   };

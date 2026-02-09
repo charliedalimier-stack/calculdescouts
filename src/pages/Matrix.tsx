@@ -23,28 +23,17 @@ const getQuadrant = (margin: number, volume: number, avgMargin: number, avgVolum
   return "dog";
 };
 
-// Convert DataMode directly to 'budget' | 'reel' (no longer using 'simulation')
-const mapDataModeToProductMode = (mode: DataMode): 'budget' | 'reel' => {
-  return mode;
-};
 
 const Matrix = () => {
   const [selectedYear, setSelectedYear] = useState(getCurrentYear());
   const [dataMode, setDataMode] = useState<DataMode>('budget');
 
-  // Convert DataMode to the mode expected by hooks
-  const productMode = mapDataModeToProductMode(dataMode);
-
-  // Log current mode for debugging
-  console.log('[Matrix] Current dataMode:', dataMode, '-> productMode:', productMode);
-
   const handlePeriodChange = ({ year, mode }: { month?: number; year: number; mode: DataMode }) => {
-    console.log('[Matrix] Period changed:', { year, mode });
     setSelectedYear(year);
     setDataMode(mode);
   };
 
-  const { productsWithCosts, isLoadingWithCosts } = useProducts(productMode);
+  const { productsWithCosts, isLoadingWithCosts } = useProducts(dataMode);
   const { productSales, isLoading: isLoadingSales } = useProductSalesAnalysis(selectedYear);
 
   // Group real products by BCG quadrant
@@ -53,7 +42,7 @@ const Matrix = () => {
       return { star: [], cashcow: [], dilemma: [], dog: [] };
     }
 
-    console.log('[Matrix] productSales:', productSales.length, 'mode:', dataMode);
+    
 
     // Create a map of product sales volumes based on mode
     const volumeMap: Record<string, number> = {};
@@ -164,7 +153,7 @@ const Matrix = () => {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <BCGMatrix year={selectedYear} mode={productMode} />
+        <BCGMatrix year={selectedYear} mode={dataMode} />
 
         <Card>
           <CardHeader>

@@ -260,12 +260,12 @@ const SettingsPage = () => {
               Objectifs financiers
             </CardTitle>
             <CardDescription>
-              Définissez vos objectifs de chiffre d'affaires annuel HTVA pour les simulations
+              Définissez vos objectifs de revenu net annuel (après impôts et cotisations). Le CA nécessaire sera calculé automatiquement.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="seuil_viabilite">Seuil de viabilité (€ HTVA / an)</Label>
+              <Label htmlFor="seuil_viabilite">Seuil de viabilité – Revenu net annuel (€)</Label>
               <Input
                 id="seuil_viabilite"
                 type="number"
@@ -274,11 +274,11 @@ const SettingsPage = () => {
                 onChange={(e) => handleChange('seuil_viabilite', e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                CA minimum pour couvrir vos besoins personnels
+                Revenu net minimum pour couvrir vos besoins personnels
               </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="revenu_ideal">Revenu idéal (€ HTVA / an)</Label>
+              <Label htmlFor="revenu_ideal">Revenu idéal – Revenu net annuel (€)</Label>
               <Input
                 id="revenu_ideal"
                 type="number"
@@ -287,7 +287,7 @@ const SettingsPage = () => {
                 onChange={(e) => handleChange('revenu_ideal', e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                CA cible pour atteindre votre objectif de rémunération
+                Revenu net cible pour atteindre votre objectif de rémunération
               </p>
             </div>
           </CardContent>

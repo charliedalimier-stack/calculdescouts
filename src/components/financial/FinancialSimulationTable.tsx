@@ -24,7 +24,8 @@ const formatValue = (value: number): string => {
 };
 
 const rows: { key: keyof SimulationScenario; label: string; isBold?: boolean }[] = [
-  { key: "ca", label: "Chiffre d'affaires HTVA", isBold: true },
+  { key: "revenu_net_cible", label: "Revenu net cible", isBold: true },
+  { key: "ca", label: "Chiffre d'affaires nécessaire (HTVA)", isBold: true },
   { key: "achats_marchandises", label: "Achat marchandises" },
   { key: "charges_professionnelles", label: "Charges professionnelles" },
   { key: "revenu_brut", label: "Revenus professionnels bruts", isBold: true },
@@ -64,7 +65,14 @@ export function FinancialSimulationTable({ scenarios }: FinancialSimulationTable
                     {row.label}
                   </TableCell>
                   {scenarios.map((s, i) => {
-                    const value = s[row.key] as number;
+                    const value = s[row.key] as number | null;
+                    if (value === null) {
+                      return (
+                        <TableCell key={i} className="text-right text-muted-foreground">
+                          –
+                        </TableCell>
+                      );
+                    }
                     const isNegative = value < 0;
                     return (
                       <TableCell
@@ -83,7 +91,7 @@ export function FinancialSimulationTable({ scenarios }: FinancialSimulationTable
           </Table>
         </div>
         <p className="text-xs text-muted-foreground mt-4">
-          💡 Le seuil de rentabilité est calculé automatiquement. Les scénarios Viabilité et Revenu idéal utilisent les objectifs définis dans les Paramètres.
+          💡 Le seuil de rentabilité correspond à un résultat net = 0 €. Les scénarios Viabilité et Revenu idéal partent du revenu net cible défini dans les Paramètres et calculent le CA nécessaire par itération.
         </p>
       </CardContent>
     </Card>

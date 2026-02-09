@@ -3,6 +3,7 @@ import { FinancialPlanData, FiscalParams } from './useFinancialPlan';
 
 export interface SimulationScenario {
   label: string;
+  revenu_net_cible: number | null;
   ca: number;
   achats_marchandises: number;
   charges_professionnelles: number;
@@ -45,7 +46,8 @@ function computeScenario(
   ca: number,
   coefficient: number,
   totalCharges: number,
-  fiscalParams: FiscalParams
+  fiscalParams: FiscalParams,
+  revenuNetCible: number | null = null,
 ): SimulationScenario {
   const achats = coefficient > 0 ? ca / coefficient : 0;
   const revenuBrut = ca - achats - totalCharges;
@@ -62,6 +64,7 @@ function computeScenario(
 
   return {
     label,
+    revenu_net_cible: revenuNetCible,
     ca,
     achats_marchandises: achats,
     charges_professionnelles: totalCharges,
@@ -73,9 +76,10 @@ function computeScenario(
 }
 
 /**
- * Binary search for the CA that yields resultat_net ≈ 0
+ * Binary search for the CA that yields resultat_net ≈ targetNet
  */
-function findBreakevenCA(
+function findCAForTargetNet(
+  targetNet: number,
   coefficient: number,
   totalCharges: number,
   fiscalParams: FiscalParams
@@ -87,9 +91,9 @@ function findBreakevenCA(
     const mid = (low + high) / 2;
     const scenario = computeScenario('', mid, coefficient, totalCharges, fiscalParams);
     
-    if (Math.abs(scenario.resultat_net) < 1) break; // Close enough
+    if (Math.abs(scenario.resultat_net - targetNet) < 1) break;
     
-    if (scenario.resultat_net < 0) {
+    if (scenario.resultat_net < targetNet) {
       low = mid;
     } else {
       high = mid;
@@ -102,29 +106,35 @@ function findBreakevenCA(
 export function useFinancialSimulation(
   baseData: FinancialPlanData | undefined,
   fiscalParams: FiscalParams,
-  seuilViabilite: number,
-  revenuIdeal: number,
+  seuilViabiliteNet: number,
+  revenuIdealNet: number,
 ) {
   return useMemo(() => {
     if (!baseData) return { scenarios: [] as SimulationScenario[] };
 
-    const coefficient = baseData.coefficient > 0 ? baseData.coefficient : 2.5; // fallback
+    const coefficient = baseData.coefficient > 0 ? baseData.coefficient : 2.5;
     const totalCharges = baseData.charges_professionnelles.total;
 
     // 1. Breakeven (résultat net = 0)
-    const breakevenCA = findBreakevenCA(coefficient, totalCharges, fiscalParams);
-    const breakeven = computeScenario('Seuil de rentabilité (équilibre)', breakevenCA, coefficient, totalCharges, fiscalParams);
-
-    // 2. Viability threshold
-    const viability = computeScenario('Seuil de viabilité', seuilViabilite, coefficient, totalCharges, fiscalParams);
-
-    // 3. Ideal revenue
-    const ideal = computeScenario('Revenu idéal', revenuIdeal, coefficient, totalCharges, fiscalParams);
+    const breakevenCA = findCAForTargetNet(0, coefficient, totalCharges, fiscalParams);
+    const breakeven = computeScenario('Seuil de rentabilité (équilibre)', breakevenCA, coefficient, totalCharges, fiscalParams, 0);
 
     const scenarios: SimulationScenario[] = [breakeven];
-    if (seuilViabilite > 0) scenarios.push(viability);
-    if (revenuIdeal > 0) scenarios.push(ideal);
+
+    // 2. Viability: find CA for target net = seuilViabiliteNet
+    if (seuilViabiliteNet > 0) {
+      const viabilityCA = findCAForTargetNet(seuilViabiliteNet, coefficient, totalCharges, fiscalParams);
+      const viability = computeScenario('Seuil de viabilité', viabilityCA, coefficient, totalCharges, fiscalParams, seuilViabiliteNet);
+      scenarios.push(viability);
+    }
+
+    // 3. Ideal: find CA for target net = revenuIdealNet
+    if (revenuIdealNet > 0) {
+      const idealCA = findCAForTargetNet(revenuIdealNet, coefficient, totalCharges, fiscalParams);
+      const ideal = computeScenario('Revenu idéal', idealCA, coefficient, totalCharges, fiscalParams, revenuIdealNet);
+      scenarios.push(ideal);
+    }
 
     return { scenarios, breakevenCA };
-  }, [baseData, fiscalParams, seuilViabilite, revenuIdeal]);
+  }, [baseData, fiscalParams, seuilViabiliteNet, revenuIdealNet]);
 }

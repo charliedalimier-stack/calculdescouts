@@ -81,8 +81,6 @@ const COLORS = [
 export function StockReport({ mode }: StockReportProps) {
   const { data: stockData, isLoading } = useStockReport(mode);
 
-  // DEBUG: Log parameters and data
-  console.log('[StockReport] mode:', mode, 'dataCount:', stockData?.length);
 
   if (isLoading) {
     return <div className="flex items-center justify-center p-8">Chargement...</div>;

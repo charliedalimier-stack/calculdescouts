@@ -32,10 +32,6 @@ const MONTHS = MONTH_LABELS_FULL.map((label, index) => ({
   label,
 }));
 
-// Convert DataMode directly to 'budget' | 'reel' (no longer using 'simulation')
-const mapDataModeToProductMode = (mode: DataMode): 'budget' | 'reel' => {
-  return mode;
-};
 
 const Index = () => {
   const [periodType, setPeriodType] = useState<'month' | 'year'>('month');
@@ -43,18 +39,12 @@ const Index = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [dataMode, setDataMode] = useState<DataMode>('budget');
 
-  // Convert DataMode to the mode expected by hooks
-  const productMode = mapDataModeToProductMode(dataMode);
-
-  // Log current mode for debugging
-  console.log('[Index] Current dataMode:', dataMode, '-> productMode:', productMode);
-
-  const { products, isLoadingWithCosts } = useProducts(productMode);
+  const { products, isLoadingWithCosts } = useProducts(dataMode);
   const { data: synthesisData, isLoading: isLoadingSynthesis } = useGlobalSynthesis({
     periodType,
     year: selectedYear,
     month: periodType === 'month' ? selectedMonth : undefined,
-    mode: productMode,
+    mode: dataMode,
   });
 
   // Default synthesis if no data
@@ -101,7 +91,6 @@ const Index = () => {
 
   // Period change handler
   const handlePeriodChange = ({ month, year, mode }: { month?: number; year: number; mode: DataMode }) => {
-    console.log('[Index] Period changed:', { month, year, mode });
     if (month !== undefined) setSelectedMonth(month);
     setSelectedYear(year);
     setDataMode(mode);
@@ -257,18 +246,18 @@ const Index = () => {
       {/* Main Charts */}
       <div className="mb-8 grid gap-6 lg:grid-cols-3">
         <SalesChart year={selectedYear} />
-        <ProductAlerts mode={productMode} />
+        <ProductAlerts mode={dataMode} />
       </div>
 
       {/* Secondary Charts */}
       <div className="mb-8 grid gap-6 lg:grid-cols-2">
-        <MarginChart mode={productMode} />
+        <MarginChart mode={dataMode} />
         <CategoryPieChart year={selectedYear} mode={dataMode} />
       </div>
 
       {/* BCG Matrix */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <BCGMatrix year={selectedYear} mode={productMode} />
+        <BCGMatrix year={selectedYear} mode={dataMode} />
         <div className="rounded-lg border border-border bg-card p-6">
           <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-foreground">
             <ChefHat className="h-5 w-5 text-primary" />

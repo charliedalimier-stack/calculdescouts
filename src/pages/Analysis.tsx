@@ -32,11 +32,8 @@ const Analysis = () => {
   const [selectedYear, setSelectedYear] = useState(getCurrentYear());
   const [dataMode, setDataMode] = useState<DataMode>('budget');
 
-  // Log current mode for debugging
-  console.log('[Analysis] Current dataMode:', dataMode);
 
   const handlePeriodChange = ({ year, mode }: { month?: number; year: number; mode: DataMode }) => {
-    console.log('[Analysis] Period changed:', { year, mode });
     setSelectedYear(year);
     setDataMode(mode);
   };
@@ -55,7 +52,7 @@ const Analysis = () => {
   const paretoData = useMemo(() => {
     if (!productsWithCosts || !productSales || productSales.length === 0) return [];
 
-    console.log('[Analysis] Pareto - productSales:', productSales.length, 'mode:', dataMode);
+    
 
     const productCA: Record<string, { name: string; ca: number }> = {};
 

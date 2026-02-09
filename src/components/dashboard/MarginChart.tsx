@@ -25,7 +25,7 @@ interface MarginChartProps {
 export function MarginChart({ mode = 'budget' }: MarginChartProps) {
   const { productsWithCosts, isLoadingWithCosts } = useProducts(mode);
 
-  console.log('[MarginChart] mode:', mode, 'products:', productsWithCosts?.length);
+  
 
   const data = productsWithCosts
     ?.filter((p) => p.margin !== null && p.margin !== undefined)

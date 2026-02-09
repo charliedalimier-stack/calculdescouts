@@ -30,7 +30,7 @@ export function CategoryPieChart({ year, mode }: CategoryPieChartProps) {
   const data = useMemo(() => {
     if (!byChannel || byChannel.length === 0) return [];
 
-    console.log('[CategoryPieChart] byChannel data:', byChannel, 'mode:', mode);
+    
 
     // Use budget or reel CA based on mode
     const channelData = byChannel.map((ch, index) => ({

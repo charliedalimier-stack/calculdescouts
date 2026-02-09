@@ -54,15 +54,13 @@ export function useSales(month?: string, mode: 'budget' | 'reel' = 'budget') {
   
   const currentMonth = month || new Date().toISOString().slice(0, 7) + '-01';
 
-  // Log mode usage for debugging
-  console.log('[useSales] Using mode:', mode, 'month:', currentMonth, 'project:', currentProject?.id);
 
   const { data: salesData = [], isLoading } = useQuery({
     queryKey: ['sales-data', currentProject?.id, currentMonth, mode],
     queryFn: async () => {
       if (!currentProject?.id) return [];
 
-      console.log('[useSales] Fetching sales with mode:', mode);
+      
 
       // Fetch products
       const { data: products, error: productsError } = await supabase
@@ -187,7 +185,7 @@ export function useSales(month?: string, mode: 'budget' | 'reel' = 'budget') {
         };
       });
 
-      console.log('[useSales] Fetched', result.length, 'products with sales data');
+      return result;
       return result;
     },
     enabled: !!currentProject?.id,
@@ -283,7 +281,7 @@ export function useAnnualSales(year: number, mode: 'budget' | 'reel' = 'budget')
     return `${year}-${m}-01`;
   });
 
-  console.log('[useAnnualSales] Using mode:', mode, 'year:', year);
+  
 
   const { data: annualData = [], isLoading } = useQuery({
     queryKey: ['annual-sales-data', currentProject?.id, year, mode],

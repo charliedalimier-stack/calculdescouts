@@ -50,7 +50,7 @@ export function BCGMatrix({ year = new Date().getFullYear(), mode = 'budget' }: 
   // Convert mode to data mode for selecting correct sales data
   const dataMode = mode === 'budget' ? 'budget' : 'reel';
 
-  console.log('[BCGMatrix] year:', year, 'mode:', mode, 'dataMode:', dataMode, 'productSales:', productSales?.length, 'products:', productsWithCosts?.length);
+  
 
   const { products, avgMargin, avgVolume, maxMargin, maxVolume } = useMemo(() => {
     if (!productsWithCosts || !productSales || productSales.length === 0) {

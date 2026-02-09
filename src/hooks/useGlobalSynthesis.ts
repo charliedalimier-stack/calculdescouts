@@ -2,11 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '@/contexts/ProjectContext';
 
-// Mode is now unified: 'budget' | 'reel'
-// No more 'simulation' - all references have been normalized to 'budget'
-const mapModeForSales = (mode: string): 'budget' | 'reel' => {
-  return mode === 'budget' ? 'budget' : 'reel';
-};
 
 export interface GlobalSynthesis {
   // Key figures
@@ -90,8 +85,6 @@ interface UseGlobalSynthesisParams {
 export function useGlobalSynthesis({ periodType, year, month, mode = 'budget' }: UseGlobalSynthesisParams) {
   const { currentProject } = useProject();
 
-  // Log mode usage for debugging
-  console.log('[useGlobalSynthesis] Using mode:', mode, 'year:', year, 'month:', month);
 
   return useQuery({
     queryKey: ['global-synthesis', currentProject?.id, mode, periodType, year, month],
@@ -101,7 +94,7 @@ export function useGlobalSynthesis({ periodType, year, month, mode = 'budget' }:
       }
 
       const projectId = currentProject.id;
-      console.log('[useGlobalSynthesis] Fetching synthesis with mode:', mode);
+      
       
       // Build date range based on period type
       let startDate: string;
@@ -172,7 +165,7 @@ export function useGlobalSynthesis({ periodType, year, month, mode = 'budget' }:
       const tvaAchat = settings?.tva_achat || 20;
 
       // Fetch sales data from annual_sales and calculate monthly distribution
-      const salesMode = mapModeForSales(mode);
+      const salesMode = mode;
       
       // First, try to get data from the new annual_sales system
       const { data: annualSales } = await supabase
@@ -551,7 +544,7 @@ export function useGlobalSynthesis({ periodType, year, month, mode = 'budget' }:
         }))
         .sort((a, b) => b.ca - a.ca);
 
-      console.log('[useGlobalSynthesis] Computed CA:', totalCaHt, 'Marge:', margeBrute, 'for mode:', mode);
+      
 
       return {
         ca_ht: totalCaHt,

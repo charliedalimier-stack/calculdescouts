@@ -59,15 +59,13 @@ export function useProducts(mode: 'budget' | 'reel' = 'budget') {
   const { settings } = useProjectSettings();
   const queryClient = useQueryClient();
 
-  // Log mode usage for debugging
-  console.log('[useProducts] Using mode:', mode, 'for project:', currentProject?.id);
 
   const { data: products = [], isLoading, error } = useQuery({
     queryKey: ['products', currentProject?.id, mode],
     queryFn: async () => {
       if (!currentProject?.id) return [];
       
-      console.log('[useProducts] Fetching products with mode:', mode);
+      
       
       const { data, error } = await supabase
         .from('products')
@@ -77,7 +75,7 @@ export function useProducts(mode: 'budget' | 'reel' = 'budget') {
         .order('nom_produit');
       
       if (error) throw error;
-      console.log('[useProducts] Fetched', data?.length || 0, 'products for mode:', mode);
+      return data;
       return data;
     },
     enabled: !!currentProject?.id,

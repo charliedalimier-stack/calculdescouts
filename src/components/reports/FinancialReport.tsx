@@ -45,9 +45,6 @@ const TrendIcon = ({ value }: { value: number }) => {
 export function FinancialReport({ year, mode }: FinancialReportProps) {
   const { data: financialData, isLoading } = useFinancialReport(year, mode);
 
-  // DEBUG: Log parameters and data
-  console.log('[FinancialReport] year:', year, 'mode:', mode, 'dataCount:', financialData?.length);
-
   if (isLoading) {
     return <div className="flex items-center justify-center p-8">Chargement...</div>;
   }

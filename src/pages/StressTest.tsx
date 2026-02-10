@@ -1,329 +1,379 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PeriodSelector, DataMode } from "@/components/layout/PeriodSelector";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useStressTest, StressTestParams } from "@/hooks/useStressTest";
-import { StressTestChart } from "@/components/stress-test/StressTestChart";
-import { StressTestSummaryCard } from "@/components/stress-test/StressTestSummary";
-import { ScenarioComparison } from "@/components/stress-test/ScenarioComparison";
-import { ScenarioBuilder } from "@/components/stress-test/ScenarioBuilder";
-import { 
-  ShieldAlert, 
-  Play, 
-  Trash2, 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useFinancialPlan, FiscalParams } from "@/hooks/useFinancialPlan";
+import { useFinancialStressTest, StressTestParams } from "@/hooks/useFinancialStressTest";
+import { useProjectSettings } from "@/hooks/useProjectSettings";
+import { useTaxBrackets } from "@/hooks/useTaxBrackets";
+import {
   AlertTriangle,
-  CheckCircle
+  TrendingDown,
+  TrendingUp,
+  Activity,
+  DollarSign,
+  BarChart3,
+  Percent,
 } from "lucide-react";
 
 export default function StressTest() {
-  const { 
-    cashFlowData,
-    savedScenarios,
-    predefinedScenarios,
-    isLoading,
-    calculateStressTest,
-    getStressTestSummary,
-    compareScenarios,
-    saveScenario,
-    deleteScenario,
-  } = useStressTest();
+  const [year, setYear] = useState(2026);
+  const [mode, setMode] = useState<DataMode>("budget");
 
-  const [activeScenario, setActiveScenario] = useState<{ name: string; params: StressTestParams } | null>(null);
-  const [selectedPredefined, setSelectedPredefined] = useState<string[]>([]);
+  const { settings, isLoading: isLoadingSettings } = useProjectSettings();
+  const { brackets, isLoading: isLoadingBrackets } = useTaxBrackets();
 
-  // Résultats du scénario actif
-  const activeResults = useMemo(() => {
-    if (!activeScenario) return null;
-    return {
-      data: calculateStressTest(activeScenario.params),
-      summary: getStressTestSummary(activeScenario.params, activeScenario.name),
-    };
-  }, [activeScenario, calculateStressTest, getStressTestSummary]);
-
-  // Comparaison des scénarios sélectionnés
-  const comparisonData = useMemo(() => {
-    const scenariosToCompare = predefinedScenarios.filter(s => selectedPredefined.includes(s.name));
-    return compareScenarios(scenariosToCompare);
-  }, [selectedPredefined, predefinedScenarios, compareScenarios]);
-
-  const handleSelectPredefined = (name: string) => {
-    setSelectedPredefined(prev => 
-      prev.includes(name) 
-        ? prev.filter(n => n !== name)
-        : [...prev, name]
-    );
+  const fiscalParams: FiscalParams = {
+    tauxCotisationsSociales: settings?.taux_cotisations_sociales ?? 20.5,
+    tauxCommunal: settings?.taux_communal ?? 7.0,
+    nombreEnfantsCharge: settings?.nombre_enfants_charge ?? 0,
+    quotiteExempteeBase: settings?.quotite_exemptee_base ?? 10570,
+    majorationParEnfant: settings?.majoration_par_enfant ?? 1850,
+    taxBrackets: brackets.map((b) => ({
+      tranche_min: b.tranche_min,
+      tranche_max: b.tranche_max,
+      taux: b.taux,
+      ordre: b.ordre,
+    })),
   };
 
-  const handleRunPredefined = (scenario: { name: string; params: StressTestParams }) => {
-    setActiveScenario(scenario);
+  const { data: financialPlanData, isLoading: isLoadingPlan } = useFinancialPlan(year, fiscalParams);
+
+  // Get reference data for the selected mode
+  const baseData = financialPlanData?.yearN?.[mode];
+
+  const [params, setParams] = useState<StressTestParams>({
+    variationCA: 0,
+    variationCoefficient: 0,
+    variationCharges: 0,
+  });
+
+  const { results, isResultatNegatif, isTresorerieRisque, stressedData } = useFinancialStressTest(
+    baseData || {
+      ca_total: 0,
+      achats_marchandises: 0,
+      coefficient: 0,
+      benefice_brut: 0,
+      charges_professionnelles: { total: 0, by_category: {} },
+      resultat_independant: 0,
+      revenu_brut: 0,
+      cotisations_sociales: 0,
+      benefice_net_avant_impots: 0,
+      quotite_exemptee: 0,
+      base_imposable: 0,
+      impot_base: 0,
+      impot_communal: 0,
+      impot_total: 0,
+      benefice_exercice: 0,
+      remuneration_annuelle: 0,
+      remuneration_mensuelle: 0,
+    },
+    params,
+    fiscalParams
+  );
+
+  // Console log for validation
+  useEffect(() => {
+    if (baseData) {
+      console.log("[Stress Test]", {
+        mode,
+        year,
+        caReference: baseData.ca_total,
+        caStressed: stressedData.ca_total,
+        resultatNet: stressedData.benefice_exercice,
+      });
+    }
+  }, [baseData, stressedData, mode, year]);
+
+  const handlePeriodChange = ({ year: newYear, mode: newMode }: { month?: number; year: number; mode: DataMode }) => {
+    setYear(newYear);
+    setMode(newMode);
   };
 
-  const handleCustomCalculate = (params: StressTestParams) => {
-    setActiveScenario({ name: 'Scénario personnalisé', params });
+  const isLoading = isLoadingSettings || isLoadingBrackets || isLoadingPlan;
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat("fr-BE", {
+      style: "currency",
+      currency: "EUR",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
+
+  const formatPercent = (value: number) => {
+    const sign = value >= 0 ? "+" : "";
+    return `${sign}${value.toFixed(1)}%`;
   };
 
-  const handleSaveScenario = (name: string, params: StressTestParams) => {
-    saveScenario.mutate({ name, params });
+  const getEcartColor = (ecart: number, isExpense: boolean) => {
+    if (isExpense) {
+      return ecart < 0 ? "text-emerald-600 dark:text-emerald-400" : ecart > 0 ? "text-destructive" : "";
+    }
+    return ecart > 0 ? "text-emerald-600 dark:text-emerald-400" : ecart < 0 ? "text-destructive" : "";
   };
+
+  const isExpenseIndicator = (key: string) =>
+    ["achats_marchandises", "charges_professionnelles_total", "impot_total", "cotisations_sociales"].includes(key);
 
   if (isLoading) {
     return (
-      <AppLayout title="Stress Test Trésorerie">
+      <AppLayout title="Stress Test" subtitle="Simulation d'impact sur la rentabilité">
         <div className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-4">
-            {[1, 2, 3, 4].map(i => (
-              <Skeleton key={i} className="h-32" />
-            ))}
-          </div>
+          <Skeleton className="h-10 w-96" />
           <Skeleton className="h-96" />
         </div>
       </AppLayout>
     );
   }
 
-  if (cashFlowData.length === 0) {
-    return (
-      <AppLayout title="Stress Test Trésorerie" subtitle="Simulez l'impact de scénarios de crise sur votre trésorerie">
-        <Alert>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Données insuffisantes</AlertTitle>
-          <AlertDescription>
-            Pour effectuer un stress test, vous devez d'abord saisir des données de cash-flow.
-            Rendez-vous dans la section Cash-flow pour commencer.
-          </AlertDescription>
-        </Alert>
-      </AppLayout>
-    );
-  }
+  const hasData = baseData && baseData.ca_total > 0;
 
   return (
-    <AppLayout title="Stress Test Trésorerie" subtitle="Simulez l'impact de scénarios de crise sur votre trésorerie">
+    <AppLayout title="Stress Test" subtitle="Simulation d'impact sur la rentabilité">
       <div className="space-y-6">
-        <Tabs defaultValue="predefined" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="predefined">Scénarios prédéfinis</TabsTrigger>
-            <TabsTrigger value="custom">Scénario personnalisé</TabsTrigger>
-            <TabsTrigger value="compare">Comparaison</TabsTrigger>
-            <TabsTrigger value="saved">Scénarios sauvegardés ({savedScenarios.length})</TabsTrigger>
-          </TabsList>
+        {/* Period Selector */}
+        <PeriodSelector
+          year={year}
+          mode={mode}
+          showMonth={false}
+          onChange={handlePeriodChange}
+        />
 
-          {/* Scénarios prédéfinis */}
-          <TabsContent value="predefined" className="space-y-4">
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-              {predefinedScenarios.map((scenario) => {
-                const summary = getStressTestSummary(scenario.params, scenario.name);
-                const isSelected = selectedPredefined.includes(scenario.name);
-                const isActive = activeScenario?.name === scenario.name;
-
-                return (
-                  <Card 
-                    key={scenario.name}
-                    className={`cursor-pointer transition-all ${
-                      isActive ? 'ring-2 ring-primary' : 
-                      isSelected ? 'ring-2 ring-chart-1' : ''
-                    }`}
-                  >
-                    <CardHeader className="pb-2">
-                      <div className="flex items-start justify-between">
-                        <CardTitle className="text-sm font-medium">
-                          {scenario.name}
-                        </CardTitle>
-                        <Badge 
-                          variant={
-                            summary.risqueLevel === 'critical' ? 'destructive' :
-                            summary.risqueLevel === 'high' ? 'default' :
-                            'secondary'
-                          }
-                          className="text-xs"
-                        >
-                          {summary.risqueLevel === 'critical' ? 'Critique' :
-                           summary.risqueLevel === 'high' ? 'Élevé' :
-                           summary.risqueLevel === 'medium' ? 'Modéré' : 'Faible'}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        {scenario.params.baisseVentesPct > 0 && (
-                          <div>
-                            <span className="text-muted-foreground">Ventes:</span>
-                            <span className="ml-1 text-destructive">-{scenario.params.baisseVentesPct}%</span>
-                          </div>
-                        )}
-                        {scenario.params.hausseCoutMatieresPct > 0 && (
-                          <div>
-                            <span className="text-muted-foreground">Coûts:</span>
-                            <span className="ml-1 text-amber-600">+{scenario.params.hausseCoutMatieresPct}%</span>
-                          </div>
-                        )}
-                        {scenario.params.retardPaiementJours > 0 && (
-                          <div>
-                            <span className="text-muted-foreground">Retard:</span>
-                            <span className="ml-1 text-orange-600">+{scenario.params.retardPaiementJours}j</span>
-                          </div>
-                        )}
-                        {scenario.params.augmentationStockPct > 0 && (
-                          <div>
-                            <span className="text-muted-foreground">Stock:</span>
-                            <span className="ml-1 text-purple-600">+{scenario.params.augmentationStockPct}%</span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          className="flex-1 gap-1"
-                          onClick={() => handleRunPredefined(scenario)}
-                        >
-                          <Play className="h-3 w-3" />
-                          Simuler
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant={isSelected ? "default" : "ghost"}
-                          onClick={() => handleSelectPredefined(scenario.name)}
-                        >
-                          {isSelected ? <CheckCircle className="h-4 w-4" /> : '+'}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-
-            {/* Résultats du scénario actif */}
-            {activeResults && (
-              <div className="space-y-4">
-                <StressTestSummaryCard summary={activeResults.summary} />
-                <StressTestChart 
-                  data={activeResults.data} 
-                  scenarioName={activeScenario?.name || ''} 
-                />
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Scénario personnalisé */}
-          <TabsContent value="custom" className="space-y-4">
-            <div className="grid gap-4 lg:grid-cols-3">
-              <ScenarioBuilder 
-                onCalculate={handleCustomCalculate}
-                onSave={handleSaveScenario}
-                isLoading={saveScenario.isPending}
-              />
-              <div className="lg:col-span-2 space-y-4">
-                {activeResults && (
-                  <>
-                    <StressTestSummaryCard summary={activeResults.summary} />
-                    <StressTestChart 
-                      data={activeResults.data} 
-                      scenarioName={activeScenario?.name || ''} 
-                    />
-                  </>
+        {!hasData ? (
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Données insuffisantes</AlertTitle>
+            <AlertDescription>
+              Aucune donnée de ventes trouvée en mode {mode === "budget" ? "Budget" : "Réel"} pour {year}.
+              Saisissez d'abord vos ventes annuelles pour utiliser le stress test.
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <>
+            {/* Risk alerts */}
+            {(isResultatNegatif || isTresorerieRisque) && (
+              <div className="space-y-2">
+                {isResultatNegatif && (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Résultat négatif</AlertTitle>
+                    <AlertDescription>
+                      Avec ces paramètres, le bénéfice net devient négatif.
+                      L'activité ne serait pas rentable dans ce scénario.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {isTresorerieRisque && !isResultatNegatif && (
+                  <Alert className="border-amber-500 bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-100">
+                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                    <AlertTitle>Risque de trésorerie</AlertTitle>
+                    <AlertDescription>
+                      Le résultat indépendant ou le bénéfice avant impôts est négatif.
+                    </AlertDescription>
+                  </Alert>
                 )}
               </div>
-            </div>
-          </TabsContent>
-
-          {/* Comparaison */}
-          <TabsContent value="compare" className="space-y-4">
-            {selectedPredefined.length === 0 ? (
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Aucun scénario sélectionné</AlertTitle>
-                <AlertDescription>
-                  Retournez dans l'onglet "Scénarios prédéfinis" et cliquez sur le bouton "+" 
-                  pour ajouter des scénarios à comparer.
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <ScenarioComparison scenarios={comparisonData} />
             )}
-          </TabsContent>
 
-          {/* Scénarios sauvegardés */}
-          <TabsContent value="saved" className="space-y-4">
-            {savedScenarios.length === 0 ? (
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Aucun scénario sauvegardé</AlertTitle>
-                <AlertDescription>
-                  Créez un scénario personnalisé et sauvegardez-le pour le retrouver ici.
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {savedScenarios.map((scenario) => (
-                  <Card key={scenario.id}>
-                    <CardHeader className="pb-2">
-                      <div className="flex items-start justify-between">
-                        <CardTitle className="text-sm font-medium">
-                          {scenario.nom_scenario}
-                        </CardTitle>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => deleteScenario.mutate(scenario.id)}
-                        >
-                          <Trash2 className="h-3 w-3 text-destructive" />
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div>
-                          <span className="text-muted-foreground">Ventes:</span>
-                          <span className="ml-1">-{scenario.baisse_ventes_pct}%</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Coûts:</span>
-                          <span className="ml-1">+{scenario.hausse_cout_matieres_pct}%</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Retard:</span>
-                          <span className="ml-1">+{scenario.retard_paiement_jours}j</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Stock:</span>
-                          <span className="ml-1">+{scenario.augmentation_stock_pct}%</span>
-                        </div>
-                      </div>
-                      {scenario.besoin_tresorerie_max && scenario.besoin_tresorerie_max > 0 && (
-                        <div className="text-xs text-destructive">
-                          Besoin: {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(scenario.besoin_tresorerie_max)}
-                        </div>
-                      )}
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        className="w-full gap-1"
-                        onClick={() => handleRunPredefined({
-                          name: scenario.nom_scenario,
-                          params: {
-                            baisseVentesPct: scenario.baisse_ventes_pct || 0,
-                            hausseCoutMatieresPct: scenario.hausse_cout_matieres_pct || 0,
-                            retardPaiementJours: scenario.retard_paiement_jours || 0,
-                            augmentationStockPct: scenario.augmentation_stock_pct || 0,
-                          }
-                        })}
+            {/* Stress Controls */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Activity className="h-4 w-4 text-primary" />
+                  Hypothèses de stress
+                  <Badge variant="secondary" className="ml-2">
+                    {mode === "budget" ? "Budget" : "Réel"} {year}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-6 md:grid-cols-3">
+                  {/* CA Variation */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="flex items-center gap-2">
+                        <DollarSign className="h-4 w-4 text-primary" />
+                        Variation du CA
+                      </Label>
+                      <Badge
+                        variant={params.variationCA >= 0 ? "default" : "destructive"}
+                        className="min-w-16 justify-center"
                       >
-                        <Play className="h-3 w-3" />
-                        Relancer
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+                        {formatPercent(params.variationCA)}
+                      </Badge>
+                    </div>
+                    <Slider
+                      value={[params.variationCA]}
+                      onValueChange={([value]) => setParams((p) => ({ ...p, variationCA: value }))}
+                      min={-50}
+                      max={50}
+                      step={5}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>-50%</span>
+                      <span>0%</span>
+                      <span>+50%</span>
+                    </div>
+                  </div>
+
+                  {/* Coefficient Variation */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="flex items-center gap-2">
+                        <BarChart3 className="h-4 w-4 text-amber-500" />
+                        Variation coefficient
+                      </Label>
+                      <Badge
+                        variant={params.variationCoefficient >= 0 ? "default" : "destructive"}
+                        className="min-w-16 justify-center"
+                      >
+                        {formatPercent(params.variationCoefficient)}
+                      </Badge>
+                    </div>
+                    <Slider
+                      value={[params.variationCoefficient]}
+                      onValueChange={([value]) => setParams((p) => ({ ...p, variationCoefficient: value }))}
+                      min={-30}
+                      max={30}
+                      step={5}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>-30%</span>
+                      <span>0%</span>
+                      <span>+30%</span>
+                    </div>
+                  </div>
+
+                  {/* Charges Variation */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="flex items-center gap-2">
+                        <Percent className="h-4 w-4 text-orange-500" />
+                        Variation charges
+                      </Label>
+                      <Badge
+                        variant={params.variationCharges <= 0 ? "default" : "destructive"}
+                        className="min-w-16 justify-center"
+                      >
+                        {formatPercent(params.variationCharges)}
+                      </Badge>
+                    </div>
+                    <Slider
+                      value={[params.variationCharges]}
+                      onValueChange={([value]) => setParams((p) => ({ ...p, variationCharges: value }))}
+                      min={-30}
+                      max={50}
+                      step={5}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>-30%</span>
+                      <span>0%</span>
+                      <span>+50%</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Comparison Table */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Tableau comparatif</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[220px]">Indicateur</TableHead>
+                        <TableHead className="text-right">Référence</TableHead>
+                        <TableHead className="text-right">Stress Test</TableHead>
+                        <TableHead className="text-right">Écart (€)</TableHead>
+                        <TableHead className="text-right">Écart (%)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {results.map((result) => {
+                        const isExpense = isExpenseIndicator(result.key);
+                        const ecartColor = getEcartColor(result.ecartEuro, isExpense);
+                        const isResultRow = [
+                          "benefice_exercice",
+                          "remuneration_annuelle",
+                          "remuneration_mensuelle",
+                        ].includes(result.key);
+
+                        return (
+                          <TableRow
+                            key={result.key}
+                            className={isResultRow ? "font-medium bg-muted/30" : ""}
+                          >
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                {result.ecartEuro > 0 ? (
+                                  <TrendingUp
+                                    className={`h-4 w-4 ${isExpense ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}
+                                  />
+                                ) : result.ecartEuro < 0 ? (
+                                  <TrendingDown
+                                    className={`h-4 w-4 ${isExpense ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}
+                                  />
+                                ) : null}
+                                {result.indicateur}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatCurrency(result.valeurActuelle)}
+                            </TableCell>
+                            <TableCell
+                              className={`text-right ${result.valeurStress < 0 ? "text-destructive font-medium" : ""}`}
+                            >
+                              {formatCurrency(result.valeurStress)}
+                            </TableCell>
+                            <TableCell className={`text-right ${ecartColor}`}>
+                              {result.ecartEuro >= 0 ? "+" : ""}
+                              {formatCurrency(result.ecartEuro)}
+                            </TableCell>
+                            <TableCell className={`text-right ${ecartColor}`}>
+                              {formatPercent(result.ecartPct)}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Footer */}
+                <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+                  <span>
+                    Simulation basée sur {mode === "budget" ? "le Budget" : "le Réel"} {year} • Aucune donnée modifiée
+                  </span>
+                  {!isResultatNegatif && !isTresorerieRisque && (
+                    <Badge variant="outline" className="text-emerald-600 border-emerald-600 dark:text-emerald-400 dark:border-emerald-400">
+                      Scénario viable
+                    </Badge>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
     </AppLayout>
   );

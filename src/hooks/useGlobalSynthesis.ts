@@ -121,11 +121,12 @@ export function useGlobalSynthesis({ periodType, year, month, mode = 'budget' }:
       }
 
       // Fetch products with categories
+      // Products are always stored in 'budget' mode (canonical catalog)
       const { data: products } = await supabase
         .from('products')
         .select('id, nom_produit, prix_btc, tva_taux, categorie_id, categories(id, nom_categorie)')
         .eq('project_id', projectId)
-        .eq('mode', mode);
+        .eq('mode', 'budget');
 
       if (!products || products.length === 0) {
         // Even with no products, we might have expenses
@@ -255,12 +256,12 @@ export function useGlobalSynthesis({ periodType, year, month, mode = 'budget' }:
         });
       }
 
-      // Fetch product prices by category
+      // Fetch product prices by category (always from budget - canonical prices)
       const { data: productPrices } = await supabase
         .from('product_prices')
         .select('*')
         .in('product_id', products.map(p => p.id))
-        .eq('mode', mode);
+        .eq('mode', 'budget');
 
       // Fetch previous period sales from annual_sales for comparison
       const prevYear = periodType === 'year' ? year - 1 : (month === 1 ? year - 1 : year);
@@ -315,23 +316,23 @@ export function useGlobalSynthesis({ periodType, year, month, mode = 'budget' }:
         .gte('mois', startDate)
         .lte('mois', endDate);
 
-      // Fetch recipes for cost calculation
+      // Fetch recipes for cost calculation (always from budget - canonical product data)
       const { data: recipes } = await supabase
         .from('recipes')
         .select('product_id, quantite_utilisee, ingredients(cout_unitaire, tva_taux)')
-        .eq('mode', mode);
+        .eq('mode', 'budget');
 
-      // Fetch packaging
+      // Fetch packaging (always from budget)
       const { data: packaging } = await supabase
         .from('product_packaging')
         .select('product_id, quantite, packaging(cout_unitaire, tva_taux)')
-        .eq('mode', mode);
+        .eq('mode', 'budget');
 
-      // Fetch variable costs
+      // Fetch variable costs (always from budget)
       const { data: variableCosts } = await supabase
         .from('product_variable_costs')
         .select('product_id, quantite, variable_costs(cout_unitaire, tva_taux)')
-        .eq('mode', mode);
+        .eq('mode', 'budget');
 
       // Calculate product costs
       const productCosts: { [productId: string]: { cost: number; tvaDed: number } } = {};

@@ -165,34 +165,7 @@ export function useGlobalSynthesis({ periodType, year, month, mode = 'budget' }:
       const tvaVente = settings?.tva_vente || 5.5;
       const tvaAchat = settings?.tva_achat || 20;
 
-      // Fetch sales data from annual_sales and calculate monthly distribution
-      const salesMode = mode;
-      
-      // First, try to get data from the new annual_sales system
-      const { data: annualSales } = await supabase
-        .from('annual_sales')
-        .select('*, products(nom_produit, prix_btc)')
-        .eq('project_id', projectId)
-        .eq('mode', salesMode)
-        .eq('year', year);
-
-      // Fetch seasonality coefficients for monthly distribution
-      const { data: seasonality } = await supabase
-        .from('seasonality_coefficients')
-        .select('*')
-        .eq('project_id', projectId)
-        .eq('mode', salesMode)
-        .eq('year', year)
-        .maybeSingle();
-
-      // Default equal distribution if no seasonality defined
-      const getMonthCoef = (monthIndex: number): number => {
-        if (!seasonality) return 8.33 / 100;
-        const key = `month_${(monthIndex + 1).toString().padStart(2, '0')}` as keyof typeof seasonality;
-        return (Number(seasonality[key]) || 8.33) / 100;
-      };
-
-      // Convert annual sales to monthly based on period
+      // Fetch sales data - STRICT mode separation
       interface SaleEntry {
         product_id: string;
         categorie_prix: string;
@@ -202,57 +175,100 @@ export function useGlobalSynthesis({ periodType, year, month, mode = 'budget' }:
       
       const sales: SaleEntry[] = [];
       
-      if (annualSales && annualSales.length > 0) {
-        // Calculate monthly distribution from annual sales
-        annualSales.forEach(annual => {
-          if (periodType === 'month' && month) {
-            // Single month - apply coefficient
-            const coef = getMonthCoef(month - 1);
-            const qty = Math.round(annual.quantite_annuelle * coef);
+      if (mode === 'reel') {
+        // REEL mode: fetch directly from monthly_sales_reel
+        const { data: reelSales } = await supabase
+          .from('monthly_sales_reel')
+          .select('product_id, categorie_prix, quantite, month, year')
+          .eq('project_id', projectId)
+          .eq('year', year);
+
+        if (reelSales && reelSales.length > 0) {
+          reelSales.forEach(s => {
+            const sMonth = new Date(s.month).getMonth() + 1;
+            // Filter by period
+            if (periodType === 'month' && month && sMonth !== month) return;
+            
+            const qty = Number(s.quantite || 0);
             if (qty > 0) {
               sales.push({
-                product_id: annual.product_id,
-                categorie_prix: annual.categorie_prix,
+                product_id: s.product_id,
+                categorie_prix: s.categorie_prix || 'BTC',
                 quantity: qty,
-                mois: startDate,
+                mois: s.month,
               });
             }
-          } else {
-            // Full year - distribute across all months
-            for (let m = 0; m < 12; m++) {
-              const coef = getMonthCoef(m);
+          });
+        }
+
+        console.log("[Dashboard]", {
+          mode,
+          year,
+          totalSales: sales.reduce((s, e) => s + e.quantity, 0),
+          sourceCount: sales.length,
+          source: 'monthly_sales_reel',
+        });
+      } else {
+        // BUDGET mode: fetch from annual_sales + apply seasonality
+        const { data: annualSales } = await supabase
+          .from('annual_sales')
+          .select('*, products(nom_produit, prix_btc)')
+          .eq('project_id', projectId)
+          .eq('mode', 'budget')
+          .eq('year', year);
+
+        // Fetch seasonality coefficients for monthly distribution
+        const { data: seasonality } = await supabase
+          .from('seasonality_coefficients')
+          .select('*')
+          .eq('project_id', projectId)
+          .eq('mode', 'budget')
+          .eq('year', year)
+          .maybeSingle();
+
+        const getMonthCoef = (monthIndex: number): number => {
+          if (!seasonality) return 8.33 / 100;
+          const key = `month_${(monthIndex + 1).toString().padStart(2, '0')}` as keyof typeof seasonality;
+          return (Number(seasonality[key]) || 8.33) / 100;
+        };
+
+        if (annualSales && annualSales.length > 0) {
+          annualSales.forEach(annual => {
+            if (periodType === 'month' && month) {
+              const coef = getMonthCoef(month - 1);
               const qty = Math.round(annual.quantite_annuelle * coef);
               if (qty > 0) {
-                const monthStr = `${year}-${(m + 1).toString().padStart(2, '0')}-01`;
                 sales.push({
                   product_id: annual.product_id,
                   categorie_prix: annual.categorie_prix,
                   quantity: qty,
-                  mois: monthStr,
+                  mois: startDate,
                 });
               }
+            } else {
+              for (let m = 0; m < 12; m++) {
+                const coef = getMonthCoef(m);
+                const qty = Math.round(annual.quantite_annuelle * coef);
+                if (qty > 0) {
+                  const monthStr = `${year}-${(m + 1).toString().padStart(2, '0')}-01`;
+                  sales.push({
+                    product_id: annual.product_id,
+                    categorie_prix: annual.categorie_prix,
+                    quantity: qty,
+                    mois: monthStr,
+                  });
+                }
+              }
             }
-          }
-        });
-      } else {
-        // Fallback to old sales_targets/sales_actuals system for backward compatibility
-        const salesTable = mode === 'reel' ? 'sales_actuals' : 'sales_targets';
-        const qtyField = mode === 'reel' ? 'quantite_reelle' : 'quantite_objectif';
-        
-        const { data: oldSales } = await supabase
-          .from(salesTable)
-          .select('*, categorie_prix')
-          .eq('project_id', projectId)
-          .gte('mois', startDate)
-          .lte('mois', endDate);
-
-        (oldSales || []).forEach(s => {
-          sales.push({
-            product_id: s.product_id,
-            categorie_prix: (s as any).categorie_prix || 'BTC',
-            quantity: Number((s as any)[qtyField] || 0),
-            mois: s.mois,
           });
+        }
+
+        console.log("[Dashboard]", {
+          mode,
+          year,
+          totalSales: sales.reduce((s, e) => s + e.quantity, 0),
+          sourceCount: sales.length,
+          source: 'annual_sales',
         });
       }
 
@@ -263,48 +279,88 @@ export function useGlobalSynthesis({ periodType, year, month, mode = 'budget' }:
         .in('product_id', products.map(p => p.id))
         .eq('mode', 'budget');
 
-      // Fetch previous period sales from annual_sales for comparison
+      // Fetch previous period sales for comparison (same mode-specific logic)
       const prevYear = periodType === 'year' ? year - 1 : (month === 1 ? year - 1 : year);
-      const { data: prevAnnualSales } = await supabase
-        .from('annual_sales')
-        .select('*, products(nom_produit, prix_btc)')
-        .eq('project_id', projectId)
-        .eq('mode', salesMode)
-        .eq('year', prevYear);
-
-      // Calculate previous period sales
       const prevSales: SaleEntry[] = [];
-      if (prevAnnualSales && prevAnnualSales.length > 0) {
-        prevAnnualSales.forEach(annual => {
+
+      if (mode === 'reel') {
+        // Previous reel from monthly_sales_reel
+        const { data: prevReelSales } = await supabase
+          .from('monthly_sales_reel')
+          .select('product_id, categorie_prix, quantite, month, year')
+          .eq('project_id', projectId)
+          .eq('year', prevYear);
+
+        (prevReelSales || []).forEach(s => {
+          const sMonth = new Date(s.month).getMonth() + 1;
           if (periodType === 'month') {
             const prevMonth = month === 1 ? 12 : (month || 1) - 1;
-            const coef = getMonthCoef(prevMonth - 1);
-            const qty = Math.round(annual.quantite_annuelle * coef);
-            if (qty > 0) {
-              prevSales.push({
-                product_id: annual.product_id,
-                categorie_prix: annual.categorie_prix,
-                quantity: qty,
-                mois: prevStartDate,
-              });
-            }
-          } else {
-            // Full previous year
-            for (let m = 0; m < 12; m++) {
-              const coef = getMonthCoef(m);
+            if (sMonth !== prevMonth) return;
+          }
+          const qty = Number(s.quantite || 0);
+          if (qty > 0) {
+            prevSales.push({
+              product_id: s.product_id,
+              categorie_prix: s.categorie_prix || 'BTC',
+              quantity: qty,
+              mois: s.month,
+            });
+          }
+        });
+      } else {
+        // Previous budget from annual_sales + seasonality
+        const { data: prevAnnualSales } = await supabase
+          .from('annual_sales')
+          .select('*, products(nom_produit, prix_btc)')
+          .eq('project_id', projectId)
+          .eq('mode', 'budget')
+          .eq('year', prevYear);
+
+        const { data: prevSeasonality } = await supabase
+          .from('seasonality_coefficients')
+          .select('*')
+          .eq('project_id', projectId)
+          .eq('mode', 'budget')
+          .eq('year', prevYear)
+          .maybeSingle();
+
+        const getPrevMonthCoef = (monthIndex: number): number => {
+          if (!prevSeasonality) return 8.33 / 100;
+          const key = `month_${(monthIndex + 1).toString().padStart(2, '0')}` as keyof typeof prevSeasonality;
+          return (Number(prevSeasonality[key]) || 8.33) / 100;
+        };
+
+        if (prevAnnualSales && prevAnnualSales.length > 0) {
+          prevAnnualSales.forEach(annual => {
+            if (periodType === 'month') {
+              const prevMonth = month === 1 ? 12 : (month || 1) - 1;
+              const coef = getPrevMonthCoef(prevMonth - 1);
               const qty = Math.round(annual.quantite_annuelle * coef);
               if (qty > 0) {
-                const monthStr = `${prevYear}-${(m + 1).toString().padStart(2, '0')}-01`;
                 prevSales.push({
                   product_id: annual.product_id,
                   categorie_prix: annual.categorie_prix,
                   quantity: qty,
-                  mois: monthStr,
+                  mois: prevStartDate,
                 });
               }
+            } else {
+              for (let m = 0; m < 12; m++) {
+                const coef = getPrevMonthCoef(m);
+                const qty = Math.round(annual.quantite_annuelle * coef);
+                if (qty > 0) {
+                  const monthStr = `${prevYear}-${(m + 1).toString().padStart(2, '0')}-01`;
+                  prevSales.push({
+                    product_id: annual.product_id,
+                    categorie_prix: annual.categorie_prix,
+                    quantity: qty,
+                    mois: monthStr,
+                  });
+                }
+              }
             }
-          }
-        });
+          });
+        }
       }
 
       // Fetch professional expenses

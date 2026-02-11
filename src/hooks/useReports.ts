@@ -607,7 +607,7 @@ export const useStockReport = (mode: ReportMode = 'budget') => {
         .from('stocks')
         .select('*, ingredients(*), packaging(*), products(*)')
         .eq('project_id', currentProject.id)
-        .eq('mode', 'reel'); // Stocks are typically real
+        .eq('mode', mode);
 
       
 

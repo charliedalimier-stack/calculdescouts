@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { FiscalSettingsCard } from "@/components/settings/FiscalSettingsCard";
 import { TVASettingsCard, VATRegime, VATPeriodicite } from "@/components/settings/TVASettingsCard";
 import { PaymentDelaysCard } from "@/components/settings/PaymentDelaysCard";
+import { ShareProjectDialog } from "@/components/projects/ShareProjectDialog";
 
 const SettingsPage = () => {
   const { currentProject } = useProject();
@@ -120,6 +121,9 @@ const SettingsPage = () => {
       title="Paramètres" 
       subtitle={`Configuration du projet "${currentProject.nom_projet}"`}
     >
+      <div className="mb-6 flex justify-end">
+        <ShareProjectDialog />
+      </div>
       <div className="grid gap-6 md:grid-cols-2">
         {/* Règles de rentabilité */}
         <Card>

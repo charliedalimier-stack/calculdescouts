@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Copy, Trash2, FolderOpen, MoreVertical, Loader2, Check } from "lucide-react";
+import { Plus, Copy, Trash2, FolderOpen, MoreVertical, Loader2, Check, Users } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,12 +22,35 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useProjects } from "@/hooks/useProjects";
 import { useProject } from "@/contexts/ProjectContext";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 const Projects = () => {
   const { projects, isLoading, addProject, deleteProject, duplicateProject } = useProjects();
   const { currentProject, setCurrentProject } = useProject();
+  const { user } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newProject, setNewProject] = useState({ name: "", description: "" });
+
+  // Fetch member counts for all projects
+  const { data: memberCounts = {} } = useQuery({
+    queryKey: ['project-member-counts', projects.map(p => p.id)],
+    queryFn: async () => {
+      if (projects.length === 0) return {};
+      const { data } = await supabase
+        .from('project_members')
+        .select('project_id')
+        .in('project_id', projects.map(p => p.id));
+      
+      const counts: Record<string, number> = {};
+      data?.forEach((m: any) => {
+        counts[m.project_id] = (counts[m.project_id] || 0) + 1;
+      });
+      return counts;
+    },
+    enabled: projects.length > 0,
+  });
 
   const handleCreateProject = () => {
     if (newProject.name.trim()) {
@@ -150,8 +173,14 @@ const Projects = () => {
                         )}
                       </CardTitle>
                       <Badge className="bg-primary/10 text-primary border-primary/20 mt-1">
-                        Actif
+                        {project.owner_user_id === user?.id ? "Propriétaire" : "Partagé"}
                       </Badge>
+                      {(memberCounts[project.id] || 0) > 0 && (
+                        <Badge variant="outline" className="mt-1 ml-1">
+                          <Users className="mr-1 h-3 w-3" />
+                          {memberCounts[project.id]}
+                        </Badge>
+                      )}
                     </div>
                   </div>
                   <DropdownMenu>

@@ -1552,6 +1552,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      invite_project_member: {
+        Args: { _email: string; _project_id: string; _role: string }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "user" | "accompagnateur" | "admin"

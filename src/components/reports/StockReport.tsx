@@ -48,6 +48,7 @@ const getTypeIcon = (type: string) => {
     case 'ingredient':
       return <Apple className="h-4 w-4" />;
     case 'emballage':
+    case 'packaging':
       return <Box className="h-4 w-4" />;
     case 'produit_fini':
       return <Package className="h-4 w-4" />;
@@ -61,6 +62,7 @@ const getTypeLabel = (type: string) => {
     case 'ingredient':
       return 'Ingrédient';
     case 'emballage':
+    case 'packaging':
       return 'Emballage';
     case 'produit_fini':
       return 'Produit fini';
@@ -104,14 +106,24 @@ export function StockReport({ mode }: StockReportProps) {
   const okCount = stockData?.filter(s => s.statut === 'ok').length || 0;
 
   // Type breakdown for pie chart
-  const typeData = ['ingredient', 'emballage', 'produit_fini', 'sous_recette'].map(type => {
+  const typeDataRaw = ['ingredient', 'produit_fini', 'sous_recette'].map(type => {
     const items = stockData?.filter(s => s.type_stock === type) || [];
     return {
       name: getTypeLabel(type),
       value: items.reduce((sum, s) => sum + s.valeur_stock, 0),
       count: items.length,
     };
-  }).filter(t => t.count > 0);
+  });
+  // Merge emballage + packaging into one entry
+  const emballageItems = stockData?.filter(s => s.type_stock === 'emballage' || s.type_stock === 'packaging') || [];
+  if (emballageItems.length > 0) {
+    typeDataRaw.push({
+      name: 'Emballage',
+      value: emballageItems.reduce((sum, s) => sum + s.valeur_stock, 0),
+      count: emballageItems.length,
+    });
+  }
+  const typeData = typeDataRaw.filter(t => t.count > 0);
 
   // Top 10 by value for bar chart
   const topByValue = [...(stockData || [])]

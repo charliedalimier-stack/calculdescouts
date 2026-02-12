@@ -638,7 +638,7 @@ export const useStockReport = (mode: ReportMode = 'budget') => {
         let nom = '';
         if (stock.type_stock === 'ingredient' && stock.ingredients) {
           nom = stock.ingredients.nom_ingredient;
-        } else if (stock.type_stock === 'emballage' && stock.packaging) {
+        } else if ((stock.type_stock === 'emballage' || stock.type_stock === 'packaging') && stock.packaging) {
           nom = stock.packaging.nom;
         } else if (stock.type_stock === 'produit_fini' && stock.products) {
           nom = stock.products.nom_produit;

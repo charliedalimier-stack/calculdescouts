@@ -25,6 +25,7 @@ import {
   
   FileSpreadsheet,
   Landmark,
+  HelpCircle,
 } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,7 @@ const mainNavItems = [
   { title: "Plan financier", icon: FileSpreadsheet, path: "/plan-financier" },
   { title: "Rapports", icon: FileText, path: "/reports" },
   { title: "Projets", icon: FolderOpen, path: "/projects" },
+  { title: "Explications", icon: HelpCircle, path: "/explanations" },
 ];
 
 const databaseNavItems = [

@@ -30,6 +30,7 @@ import Settings from "./pages/Settings";
 
 import Reports from "./pages/Reports";
 import Investments from "./pages/Investments";
+import Explanations from "./pages/Explanations";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -67,6 +68,7 @@ const App = () => (
                 <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
                 <Route path="/investments" element={<ProtectedRoute><Investments /></ProtectedRoute>} />
+                <Route path="/explanations" element={<ProtectedRoute><Explanations /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>

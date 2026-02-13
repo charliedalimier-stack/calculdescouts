@@ -89,6 +89,7 @@ const Expenses = () => {
     categorie_frais: "autres",
     montant_ht: 0,
     tva_taux: 20,
+    recurrence: "ponctuel" as "ponctuel" | "mensuel" | "annuel",
   });
   const [duplicateSource, setDuplicateSource] = useState("");
   const [duplicateTarget, setDuplicateTarget] = useState("");
@@ -156,26 +157,44 @@ const Expenses = () => {
   }, [viewMode, selectedYear, displayedExpenses]);
 
   const handleAddExpense = () => {
-    const moisDate = viewMode === "monthly" 
-      ? `${selectedMonth}-01`
-      : `${selectedYear}-${format(new Date(), "MM")}-01`;
+    const recurrence = newExpense.recurrence;
+    const montantMensuel = recurrence === "annuel" 
+      ? newExpense.montant_ht / 12 
+      : newExpense.montant_ht;
 
-    const data = {
+    const months: string[] = [];
+
+    if (recurrence === "ponctuel") {
+      const moisDate = viewMode === "monthly" 
+        ? `${selectedMonth}-01`
+        : `${selectedYear}-${format(new Date(), "MM")}-01`;
+      months.push(moisDate);
+    } else {
+      // mensuel or annuel: create for all 12 months of selected year
+      for (let m = 1; m <= 12; m++) {
+        months.push(`${selectedYear}-${String(m).padStart(2, "0")}-01`);
+      }
+    }
+
+    const baseData = {
       libelle: newExpense.libelle.trim(),
-      montant_ht: newExpense.montant_ht,
+      montant_ht: Math.round(montantMensuel * 100) / 100,
       tva_taux: newExpense.tva_taux,
       categorie_frais: newExpense.categorie_frais,
-      mois: moisDate,
     };
 
-    const error = getValidationError(expenseSchema, data);
+    const error = getValidationError(expenseSchema, { ...baseData, mois: months[0] });
     if (error) {
       toast.error(error);
       return;
     }
 
-    addExpense.mutate(data);
-    setNewExpense({ libelle: "", categorie_frais: "autres", montant_ht: 0, tva_taux: 20 });
+    // Add expense for each month
+    months.forEach((mois) => {
+      addExpense.mutate({ ...baseData, mois });
+    });
+
+    setNewExpense({ libelle: "", categorie_frais: "autres", montant_ht: 0, tva_taux: 20, recurrence: "ponctuel" });
     setIsAddDialogOpen(false);
   };
 
@@ -403,6 +422,32 @@ const Expenses = () => {
                           onChange={(e) => setNewExpense({ ...newExpense, tva_taux: parseFloat(e.target.value) || 0 })}
                         />
                       </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Récurrence</Label>
+                      <Select
+                        value={newExpense.recurrence}
+                        onValueChange={(v) => setNewExpense({ ...newExpense, recurrence: v as "ponctuel" | "mensuel" | "annuel" })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ponctuel">Ponctuel (ce mois uniquement)</SelectItem>
+                          <SelectItem value="mensuel">Mensuel récurrent (même montant × 12 mois)</SelectItem>
+                          <SelectItem value="annuel">Annuel réparti (montant ÷ 12 mois)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {newExpense.recurrence === "annuel" && newExpense.montant_ht > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          → {new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(Math.round(newExpense.montant_ht / 12 * 100) / 100)} /mois
+                        </p>
+                      )}
+                      {newExpense.recurrence === "mensuel" && newExpense.montant_ht > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          → {new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(newExpense.montant_ht * 12)} /an
+                        </p>
+                      )}
                     </div>
                     <Button onClick={handleAddExpense} className="w-full" disabled={addExpense.isPending || !newExpense.libelle}>
                       Ajouter

@@ -113,7 +113,7 @@ export function AppSidebar() {
                 isActive={location.pathname === item.path}
               >
                 <Link to={item.path}>
-                  <item.icon className="h-4 w-4" />
+                  <item.icon className="h-4 w-4 text-primary" />
                   <span>{item.title}</span>
                 </Link>
               </SidebarMenuButton>

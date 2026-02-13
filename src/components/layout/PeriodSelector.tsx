@@ -54,8 +54,8 @@ export function PeriodSelector({
     <div className={cn("flex flex-wrap items-center gap-4", className)}>
       {/* Year Selector */}
       <Select value={year.toString()} onValueChange={handleYearChange}>
-        <SelectTrigger className="w-32">
-          <Calendar className="h-4 w-4 mr-2" />
+        <SelectTrigger className="w-32 border-primary/30 text-primary">
+          <Calendar className="h-4 w-4 mr-2 text-primary" />
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -70,7 +70,7 @@ export function PeriodSelector({
       {/* Month Selector (optional) */}
       {showMonth && month !== undefined && (
         <Select value={month.toString()} onValueChange={handleMonthChange}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-40 border-primary/30 text-primary">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -86,12 +86,12 @@ export function PeriodSelector({
       {/* Mode Selector */}
       {showMode && (
         <Tabs value={mode} onValueChange={handleModeChange}>
-          <TabsList>
-            <TabsTrigger value="budget" className="flex items-center gap-2">
+          <TabsList className="border border-primary/20">
+            <TabsTrigger value="budget" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Target className="h-4 w-4" />
               Budget
             </TabsTrigger>
-            <TabsTrigger value="reel" className="flex items-center gap-2">
+            <TabsTrigger value="reel" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <BarChart3 className="h-4 w-4" />
               Réel
             </TabsTrigger>

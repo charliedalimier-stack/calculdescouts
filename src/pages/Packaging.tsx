@@ -6,6 +6,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { useProjectSettings } from "@/hooks/useProjectSettings";
 import {
   Table,
   TableBody,
@@ -61,14 +62,17 @@ const getTypeBadge = (type: string | null) => {
 const Packaging = () => {
   const { currentProject } = useProject();
   const { packaging, isLoading, addPackaging, updatePackaging, deletePackaging } = usePackaging();
+  const { settings } = useProjectSettings();
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const defaultTva = settings?.tva_achat?.toString() ?? "21";
   const [formData, setFormData] = useState({
     nom: "",
     cout_unitaire: "",
     unite: "unité",
     type_emballage: "primaire",
+    tva_taux: defaultTva,
   });
 
   const filteredPackaging = packaging.filter((p) =>
@@ -76,16 +80,18 @@ const Packaging = () => {
   );
 
   const resetForm = () => {
-    setFormData({ nom: "", cout_unitaire: "", unite: "unité", type_emballage: "primaire" });
+    setFormData({ nom: "", cout_unitaire: "", unite: "unité", type_emballage: "primaire", tva_taux: defaultTva });
     setEditingId(null);
   };
 
   const handleSubmit = () => {
+    const tvaValue = formData.tva_taux !== "" ? parseFloat(formData.tva_taux) : (settings?.tva_achat ?? 21);
     const data = {
       nom: formData.nom.trim(),
       cout_unitaire: parseFloat(formData.cout_unitaire) || 0,
       unite: formData.unite.trim(),
       type_emballage: formData.type_emballage,
+      tva_taux: tvaValue,
     };
 
     const error = getValidationError(packagingSchema, data);
@@ -110,6 +116,7 @@ const Packaging = () => {
       cout_unitaire: item.cout_unitaire.toString(),
       unite: item.unite,
       type_emballage: item.type_emballage || "primaire",
+      tva_taux: item.tva_taux?.toString() ?? defaultTva,
     });
     setEditingId(item.id);
     setIsDialogOpen(true);
@@ -195,6 +202,23 @@ const Packaging = () => {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="tva">Taux TVA</Label>
+                <Select
+                  value={formData.tva_taux}
+                  onValueChange={(value) => setFormData({ ...formData, tva_taux: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="TVA" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">0% (Exonéré)</SelectItem>
+                    <SelectItem value="6">6%</SelectItem>
+                    <SelectItem value="12">12%</SelectItem>
+                    <SelectItem value="21">21%</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <Button
                 className="w-full"

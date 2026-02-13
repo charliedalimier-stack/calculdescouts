@@ -19,6 +19,8 @@ import { useFinancialPlan, FiscalParams } from "@/hooks/useFinancialPlan";
 import { useFinancialStressTest, StressTestParams } from "@/hooks/useFinancialStressTest";
 import { useProjectSettings } from "@/hooks/useProjectSettings";
 import { useTaxBrackets } from "@/hooks/useTaxBrackets";
+import { useAutoCashFlow } from "@/hooks/useAutoCashFlow";
+import { CashFlowStressTest } from "@/components/financial/CashFlowStressTest";
 import {
   AlertTriangle,
   TrendingDown,
@@ -52,7 +54,8 @@ export default function StressTest() {
 
   const { data: financialPlanData, isLoading: isLoadingPlan } = useFinancialPlan(year, fiscalParams);
 
-  // Get reference data for the selected mode
+  // Cash flow data for stress test
+  const { monthlyData: cashFlowData } = useAutoCashFlow({ mode, year });
   const baseData = financialPlanData?.yearN?.[mode];
 
   const [params, setParams] = useState<StressTestParams>({
@@ -372,6 +375,13 @@ export default function StressTest() {
                 </div>
               </CardContent>
             </Card>
+            {/* Cash Flow Stress Test */}
+            {cashFlowData.length > 0 && (
+              <CashFlowStressTest
+                baseData={cashFlowData}
+                year={year}
+              />
+            )}
           </>
         )}
       </div>

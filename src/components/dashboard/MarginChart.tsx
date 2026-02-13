@@ -7,16 +7,13 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
+  ReferenceLine,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useProducts } from "@/hooks/useProducts";
+import { useProjectSettings } from "@/hooks/useProjectSettings";
 import { Skeleton } from "@/components/ui/skeleton";
-
-const getBarColor = (margin: number) => {
-  if (margin >= 40) return "hsl(var(--chart-1))";
-  if (margin >= 30) return "hsl(var(--chart-4))";
-  return "hsl(var(--destructive))";
-};
 
 interface MarginChartProps {
   mode?: 'budget' | 'reel';
@@ -24,8 +21,16 @@ interface MarginChartProps {
 
 export function MarginChart({ mode = 'budget' }: MarginChartProps) {
   const { productsWithCosts, isLoadingWithCosts } = useProducts(mode);
+  const { settings } = useProjectSettings();
 
-  
+  const margeCible = settings?.marge_cible ?? 40;
+  const margeMin = settings?.marge_min ?? 30;
+
+  const getBarColor = (margin: number) => {
+    if (margin >= margeCible) return "hsl(var(--chart-1))";
+    if (margin >= margeMin) return "hsl(var(--chart-4))";
+    return "hsl(var(--destructive))";
+  };
 
   const data = productsWithCosts
     ?.filter((p) => p.margin !== null && p.margin !== undefined)
@@ -72,18 +77,21 @@ export function MarginChart({ mode = 'budget' }: MarginChartProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base font-semibold">
+        <CardTitle className="flex items-center gap-2 text-base font-semibold">
           Marge brute par produit (%)
+          <Badge variant="outline" className="ml-auto text-xs">
+            Cible: {margeCible}% | Min: {margeMin}%
+          </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} layout="vertical" margin={{ left: 20, right: 20 }}>
+            <BarChart data={data} layout="vertical" margin={{ left: 20, right: 30 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis
                 type="number"
-                domain={[0, 100]}
+                domain={[0, Math.max(100, margeCible + 10)]}
                 tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
               />
               <YAxis
@@ -92,6 +100,8 @@ export function MarginChart({ mode = 'budget' }: MarginChartProps) {
                 width={100}
                 tick={{ fill: "hsl(var(--foreground))", fontSize: 12 }}
               />
+              <ReferenceLine x={margeCible} stroke="hsl(var(--chart-1))" strokeDasharray="5 5" label={{ value: 'Cible', fill: 'hsl(var(--chart-1))', fontSize: 10 }} />
+              <ReferenceLine x={margeMin} stroke="hsl(var(--chart-4))" strokeDasharray="5 5" label={{ value: 'Min', fill: 'hsl(var(--chart-4))', fontSize: 10 }} />
               <Tooltip
                 contentStyle={{
                   backgroundColor: "hsl(var(--card))",
@@ -112,15 +122,15 @@ export function MarginChart({ mode = 'budget' }: MarginChartProps) {
         <div className="mt-4 flex items-center justify-center gap-6 text-xs">
           <div className="flex items-center gap-2">
             <div className="h-3 w-3 rounded" style={{ backgroundColor: "hsl(var(--chart-1))" }} />
-            <span className="text-muted-foreground">Rentable (≥40%)</span>
+            <span className="text-muted-foreground">Rentable (≥{margeCible}%)</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="h-3 w-3 rounded" style={{ backgroundColor: "hsl(var(--chart-4))" }} />
-            <span className="text-muted-foreground">Limite (30-40%)</span>
+            <span className="text-muted-foreground">Limite ({margeMin}-{margeCible}%)</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="h-3 w-3 rounded" style={{ backgroundColor: "hsl(var(--destructive))" }} />
-            <span className="text-muted-foreground">À revoir (&lt;30%)</span>
+            <span className="text-muted-foreground">À revoir (&lt;{margeMin}%)</span>
           </div>
         </div>
       </CardContent>

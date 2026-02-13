@@ -76,6 +76,18 @@ const formatValue = (value: number | null): string => {
   }).format(value);
 };
 
+// Keys that represent positive outcomes (revenue, profit)
+const POSITIVE_RESULT_KEYS = ["ca_total", "benefice_brut", "revenu_brut", "benefice_net", "benefice_exercice", "remuneration_annuelle", "remuneration_mensuelle"];
+
+const getValueColor = (key: string, value: number | null): string => {
+  if (value === null) return "";
+  if (POSITIVE_RESULT_KEYS.includes(key)) {
+    if (value > 0) return "text-primary";
+    if (value < 0) return "text-destructive";
+  }
+  return "";
+};
+
 const formatCoefficient = (value: number | null): string => {
   if (value === null) return "–";
   return value.toFixed(2);
@@ -275,19 +287,19 @@ const PlanFinancier = () => {
                           <TableCell className={row.isBold ? "font-semibold" : ""}>
                             {row.label}
                           </TableCell>
-                          <TableCell className="text-right bg-muted/10">
+                          <TableCell className={`text-right bg-muted/10 ${getValueColor(row.key, yearNBudget)}`}>
                             {formatFn(yearNBudget)}
                           </TableCell>
-                          <TableCell className="text-right bg-muted/10">
+                          <TableCell className={`text-right bg-muted/10 ${getValueColor(row.key, yearNReel)}`}>
                             {formatFn(yearNReel)}
                           </TableCell>
                           <TableCell className={`text-right bg-muted/10 ${getDiffColor(yearNDiff)}`}>
                             {yearNDiff !== null ? formatFn(yearNDiff) : "–"}
                           </TableCell>
-                          <TableCell className="text-right bg-muted/20">
+                          <TableCell className={`text-right bg-muted/20 ${getValueColor(row.key, yearN1Budget)}`}>
                             {formatFn(yearN1Budget)}
                           </TableCell>
-                          <TableCell className="text-right bg-muted/20">
+                          <TableCell className={`text-right bg-muted/20 ${getValueColor(row.key, yearN1Reel)}`}>
                             {formatFn(yearN1Reel)}
                           </TableCell>
                           <TableCell className={`text-right bg-muted/20 ${getDiffColor(yearN1Diff)}`}>

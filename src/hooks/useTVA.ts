@@ -335,55 +335,145 @@ export function calculateTVA(montantHT: number, tauxTVA: number): number {
   return montantHT * (tauxTVA / 100);
 }
 
-// Hook for monthly TVA tracking
+// Hook for monthly TVA tracking - computes from sales/costs data
 export function useMonthlyTVA(options?: { year?: number; mode?: string }) {
   const { currentProject } = useProject();
+  const { mode: contextMode } = useMode();
   const { settings } = useProjectSettings();
-
+  const year = options?.year || new Date().getFullYear();
+  const mode = options?.mode || contextMode;
   const projectId = currentProject?.id;
-  const year = options?.year;
-  const mode = options?.mode;
+  const isFranchise = settings?.regime_tva === 'franchise_taxe';
+  const defaultTvaVente = settings?.tva_vente || 6;
+  const defaultTvaAchat = settings?.tva_achat || 21;
 
   const { data: monthlyData = [], isLoading } = useQuery({
-    queryKey: ["monthly-tva", projectId, year, mode],
+    queryKey: ["monthly-tva-computed", projectId, mode, year],
     queryFn: async () => {
       if (!projectId) return [];
 
-      // Get cash flow data with TVA
-      let query = supabase
-        .from("cash_flow")
-        .select("*")
+      const { data: products } = await supabase
+        .from("products")
+        .select("id, nom_produit, prix_btc, tva_taux")
         .eq("project_id", projectId)
-        .order("mois", { ascending: true });
+        .eq("mode", "budget");
 
-      if (year) {
-        query = query.gte("mois", `${year}-01-01`).lte("mois", `${year}-12-31`);
+      if (!products || products.length === 0) return [];
+
+      const { data: productPrices } = await supabase
+        .from("product_prices")
+        .select("product_id, categorie_prix, prix_ht, tva_taux")
+        .in("product_id", products.map(p => p.id))
+        .eq("mode", "budget");
+
+      const priceMap: Record<string, { prix_ht: number; tva_taux: number }> = {};
+      (productPrices || []).forEach(pp => {
+        priceMap[`${pp.product_id}-${pp.categorie_prix}`] = { prix_ht: Number(pp.prix_ht), tva_taux: Number(pp.tva_taux) };
+      });
+
+      // Collect monthly sales
+      type MSale = { product_id: string; categorie_prix: string; quantity: number; month: number };
+      const monthlySales: MSale[] = [];
+
+      if (mode === "reel") {
+        const { data: reelSales } = await supabase
+          .from("monthly_sales_reel")
+          .select("product_id, categorie_prix, quantite, month")
+          .eq("project_id", projectId)
+          .eq("year", year);
+        (reelSales || []).forEach(s => {
+          const m = new Date(s.month).getMonth() + 1;
+          const qty = Number(s.quantite || 0);
+          if (qty > 0) monthlySales.push({ product_id: s.product_id, categorie_prix: s.categorie_prix || "BTC", quantity: qty, month: m });
+        });
+      } else {
+        const { data: annualSales } = await supabase
+          .from("annual_sales")
+          .select("product_id, categorie_prix, quantite_annuelle")
+          .eq("project_id", projectId).eq("mode", "budget").eq("year", year);
+        const { data: seasonality } = await supabase
+          .from("seasonality_coefficients")
+          .select("*").eq("project_id", projectId).eq("mode", "budget").eq("year", year).maybeSingle();
+        const getCoef = (mi: number) => {
+          if (!seasonality) return 8.33 / 100;
+          const key = `month_${(mi + 1).toString().padStart(2, "0")}` as keyof typeof seasonality;
+          return (Number(seasonality[key]) || 8.33) / 100;
+        };
+        (annualSales || []).forEach(a => {
+          for (let m = 0; m < 12; m++) {
+            const qty = Math.round(a.quantite_annuelle * getCoef(m));
+            if (qty > 0) monthlySales.push({ product_id: a.product_id, categorie_prix: a.categorie_prix, quantity: qty, month: m + 1 });
+          }
+        });
       }
-      if (mode) {
-        query = query.eq("mode", mode);
-      }
 
-      const { data: cashFlowData, error } = await query;
+      // Per-product unit costs
+      const { data: recipes } = await supabase.from("recipes")
+        .select("product_id, quantite_utilisee, ingredients(cout_unitaire, tva_taux)").eq("mode", "budget");
+      const { data: pkgLinks } = await supabase.from("product_packaging")
+        .select("product_id, quantite, packaging(cout_unitaire, tva_taux)").eq("mode", "budget");
+      const { data: vcLinks } = await supabase.from("product_variable_costs")
+        .select("product_id, quantite, variable_costs(cout_unitaire, tva_taux)").eq("mode", "budget");
 
-      if (error) throw error;
+      const unitTva: Record<string, number> = {};
+      const unitHt: Record<string, number> = {};
+      (recipes || []).forEach(r => {
+        const ing = r.ingredients as any; if (!ing) return;
+        const c = Number(r.quantite_utilisee) * Number(ing.cout_unitaire || 0);
+        unitHt[r.product_id] = (unitHt[r.product_id] || 0) + c;
+        unitTva[r.product_id] = (unitTva[r.product_id] || 0) + c * (Number(ing.tva_taux ?? defaultTvaAchat) / 100);
+      });
+      (pkgLinks || []).forEach(p => {
+        const pkg = p.packaging as any; if (!pkg) return;
+        const c = Number(p.quantite) * Number(pkg.cout_unitaire || 0);
+        unitHt[p.product_id] = (unitHt[p.product_id] || 0) + c;
+        unitTva[p.product_id] = (unitTva[p.product_id] || 0) + c * (Number(pkg.tva_taux ?? defaultTvaAchat) / 100);
+      });
+      (vcLinks || []).forEach(v => {
+        const vc = v.variable_costs as any; if (!vc) return;
+        const c = Number(v.quantite) * Number(vc.cout_unitaire || 0);
+        unitHt[v.product_id] = (unitHt[v.product_id] || 0) + c;
+        unitTva[v.product_id] = (unitTva[v.product_id] || 0) + c * (Number(vc.tva_taux ?? defaultTvaAchat) / 100);
+      });
 
-      return (cashFlowData || []).map((cf) => ({
-        mois: cf.mois,
-        tvaCollectee: cf.tva_collectee || 0,
-        tvaDeductible: cf.tva_deductible || 0,
-        tvaNette: (cf.tva_collectee || 0) - (cf.tva_deductible || 0),
-        resultatEconomique: cf.encaissements - cf.decaissements,
-        resultatTresorerie:
-          cf.encaissements -
-          cf.decaissements +
-          ((cf.tva_collectee || 0) - (cf.tva_deductible || 0)),
-      })) as MonthlyTVA[];
+      // Expenses by month
+      const { data: expenses } = await supabase.from("professional_expenses")
+        .select("montant_ht, tva_taux, mois").eq("project_id", projectId).eq("mode", mode)
+        .gte("mois", `${year}-01-01`).lte("mois", `${year}-12-31`);
+
+      const productMap = new Map(products.map(p => [p.id, p]));
+      const mr: Record<number, { col: number; ded: number; caHt: number; costHt: number }> = {};
+      for (let m = 1; m <= 12; m++) mr[m] = { col: 0, ded: 0, caHt: 0, costHt: 0 };
+
+      monthlySales.forEach(s => {
+        const prod = productMap.get(s.product_id); if (!prod) return;
+        const pi = priceMap[`${prod.id}-${s.categorie_prix}`];
+        const prixHt = pi?.prix_ht ?? Number(prod.prix_btc);
+        const tvaTaux = pi?.tva_taux ?? Number(prod.tva_taux) ?? defaultTvaVente;
+        const caHt = s.quantity * prixHt;
+        mr[s.month].col += isFranchise ? 0 : caHt * (tvaTaux / 100);
+        mr[s.month].ded += isFranchise ? 0 : (unitTva[s.product_id] || 0) * s.quantity;
+        mr[s.month].caHt += caHt;
+        mr[s.month].costHt += (unitHt[s.product_id] || 0) * s.quantity;
+      });
+
+      (expenses || []).forEach(e => {
+        const m = new Date(e.mois).getMonth() + 1;
+        const ht = Number(e.montant_ht || 0);
+        mr[m].ded += isFranchise ? 0 : ht * (Number(e.tva_taux ?? defaultTvaAchat) / 100);
+        mr[m].costHt += ht;
+      });
+
+      return Object.entries(mr)
+        .map(([m, d]) => {
+          const re = d.caHt - d.costHt;
+          const tn = d.col - d.ded;
+          return { mois: `${year}-${m.padStart(2, "0")}-01`, tvaCollectee: d.col, tvaDeductible: d.ded, tvaNette: tn, resultatEconomique: re, resultatTresorerie: re + tn };
+        })
+        .filter(m => m.tvaCollectee > 0 || m.tvaDeductible > 0 || m.resultatEconomique !== 0) as MonthlyTVA[];
     },
     enabled: !!projectId,
   });
 
-  return {
-    monthlyData,
-    isLoading,
-  };
+  return { monthlyData, isLoading };
 }

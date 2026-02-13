@@ -16,10 +16,8 @@ import { useProjectSettings } from "@/hooks/useProjectSettings";
 import { useTaxBrackets } from "@/hooks/useTaxBrackets";
 import { EXPENSE_CATEGORIES } from "@/hooks/useExpenses";
 import { FinancialStressTest } from "@/components/financial/FinancialStressTest";
-import { CashFlowStressTest } from "@/components/financial/CashFlowStressTest";
 import { useFinancialSimulation } from "@/hooks/useFinancialSimulation";
 import { FinancialSimulationTable } from "@/components/financial/FinancialSimulationTable";
-import { useAutoCashFlow } from "@/hooks/useAutoCashFlow";
 
 interface FinancialPlanRow {
   key: string;
@@ -156,9 +154,6 @@ const PlanFinancier = () => {
   };
 
   const { data: planData, isLoading } = useFinancialPlan(selectedYear, fiscalParams);
-
-  // Cash flow data for stress test
-  const { monthlyData: cashFlowData } = useAutoCashFlow({ mode: dataMode, year: selectedYear });
 
   // Financial simulation
   const { scenarios } = useFinancialSimulation(
@@ -318,14 +313,6 @@ const PlanFinancier = () => {
           <FinancialStressTest
             baseData={dataMode === 'reel' ? planData.yearN.reel : planData.yearN.budget}
             fiscalParams={fiscalParams}
-            year={selectedYear}
-          />
-        )}
-
-        {/* Cash Flow Stress Test */}
-        {cashFlowData.length > 0 && (
-          <CashFlowStressTest
-            baseData={cashFlowData}
             year={selectedYear}
           />
         )}

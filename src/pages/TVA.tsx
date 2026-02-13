@@ -27,10 +27,11 @@ import { getCurrentYear } from "@/lib/dateOptions";
 export default function TVA() {
   const { currentProject } = useProject();
   const [year, setYear] = useState(getCurrentYear());
+  const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [mode, setMode] = useState<DataMode>('budget');
 
-  const { summary, tvaCollectee, tvaDeductible, tvaNette, defaultTvaVente, defaultTvaAchat } =
-    useTVA({ year, mode });
+  const { summary, tvaCollectee, tvaDeductible, tvaNette, defaultTvaVente, defaultTvaAchat, isLoading: tvaLoading } =
+    useTVA({ year, mode, month });
   const { monthlyData, isLoading: monthlyLoading } = useMonthlyTVA({ year, mode });
   const { settings, updateSettings, isVATApplicable } = useProjectSettings();
 
@@ -83,7 +84,7 @@ export default function TVA() {
     );
   }
 
-  if (monthlyLoading) {
+  if (monthlyLoading || tvaLoading) {
     return (
       <AppLayout title="Gestion de la TVA" subtitle="Suivi TVA collectée et déductible">
         <div className="space-y-6">
@@ -106,11 +107,13 @@ export default function TVA() {
         {/* Period Selector */}
         <PeriodSelector
           year={year}
+          month={month ?? 1}
           mode={mode}
-          showMonth={false}
-          onChange={({ year: y, mode: m }) => {
+          showMonth={true}
+          onChange={({ month: m, year: y, mode: dm }) => {
+            setMonth(m);
             setYear(y);
-            setMode(m);
+            setMode(dm);
           }}
         />
 

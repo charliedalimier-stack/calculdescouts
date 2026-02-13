@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useProject } from "@/contexts/ProjectContext";
 import { useTVA, useMonthlyTVA } from "@/hooks/useTVA";
@@ -5,6 +6,7 @@ import { TVASummaryCards } from "@/components/tva/TVASummaryCards";
 import { TVADetailTable } from "@/components/tva/TVADetailTable";
 import { TVAMonthlyChart } from "@/components/tva/TVAMonthlyChart";
 import { TVACashFlowImpact } from "@/components/tva/TVACashFlowImpact";
+import { PeriodSelector, DataMode } from "@/components/layout/PeriodSelector";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Receipt, BarChart3, Wallet, Settings, AlertTriangle, Info } from "lucide-react";
@@ -20,12 +22,16 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { getCurrentYear } from "@/lib/dateOptions";
 
 export default function TVA() {
   const { currentProject } = useProject();
+  const [year, setYear] = useState(getCurrentYear());
+  const [mode, setMode] = useState<DataMode>('budget');
+
   const { summary, tvaCollectee, tvaDeductible, tvaNette, defaultTvaVente, defaultTvaAchat } =
-    useTVA();
-  const { monthlyData, isLoading: monthlyLoading } = useMonthlyTVA();
+    useTVA({ year, mode });
+  const { monthlyData, isLoading: monthlyLoading } = useMonthlyTVA({ year, mode });
   const { settings, updateSettings, isVATApplicable } = useProjectSettings();
 
   const handleRegimeChange = (value: VATRegime) => {
@@ -97,6 +103,17 @@ export default function TVA() {
   return (
     <AppLayout title="Gestion de la TVA" subtitle="TVA Belge - Suivi collectée et déductible">
       <div className="space-y-6">
+        {/* Period Selector */}
+        <PeriodSelector
+          year={year}
+          mode={mode}
+          showMonth={false}
+          onChange={({ year: y, mode: m }) => {
+            setYear(y);
+            setMode(m);
+          }}
+        />
+
         {/* Franchise alert */}
         {isFranchise && (
           <Alert className="border-chart-4 bg-chart-4/10">

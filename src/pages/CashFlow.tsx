@@ -25,7 +25,7 @@ import {
   Bar,
   Legend,
 } from "recharts";
-import { Wallet, TrendingUp, TrendingDown, AlertTriangle, Receipt, Package, Boxes, Zap, FileText, Info, Store, Building2, Truck, Clock, Landmark, CreditCard } from "lucide-react";
+import { Wallet, TrendingUp, TrendingDown, AlertTriangle, Receipt, Package, Boxes, Zap, FileText, Info, Clock, Landmark, CreditCard } from "lucide-react";
 import { useAutoCashFlow, CashFlowMode } from "@/hooks/useAutoCashFlow";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { DEFINITIONS } from "@/lib/pedagogicDefinitions";
@@ -161,35 +161,8 @@ const CashFlow = () => {
         </Card>
       )}
 
-      {/* Summary Cards - Row 1: Current Month HT */}
-      <div className="mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* CA reconnu vs Encaissements */}
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-chart-3/10">
-                <Receipt className="h-5 w-5 text-chart-3" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  CA HT reconnu (mois)
-                  <TooltipProvider>
-                    <RadixTooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-3 w-3 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p>Chiffre d'affaires comptabilisé à la date de vente (base économique)</p>
-                      </TooltipContent>
-                    </RadixTooltip>
-                  </TooltipProvider>
-                </p>
-                <p className="text-xl font-bold text-chart-3">{formatCurrency(currentMonthData.ca_ht_periode)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
+      {/* Summary Cards - 4 key KPIs only */}
+      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -198,12 +171,14 @@ const CashFlow = () => {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  Encaissements HT (mois)
+                  Encaissements HT
                   <InfoTooltip {...DEFINITIONS.encaissements} size="sm" />
                 </p>
-                <p className="text-xl font-bold">{formatCurrency(currentMonthData.encaissements_ht)}</p>
-                {!isFranchise && currentMonthData.tva_collectee > 0 && (
-                  <p className="text-xs text-muted-foreground">+ TVA: {formatCurrency(currentMonthData.tva_collectee)}</p>
+                <p className="text-xl font-bold">{formatCurrency(summary.total_encaissements_ht)}</p>
+                {(currentMonthData.encaissements_btc > 0 || currentMonthData.encaissements_btb > 0 || currentMonthData.encaissements_distributeur > 0) && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    BTC {formatCurrency(currentMonthData.encaissements_btc)} • BTB {formatCurrency(currentMonthData.encaissements_btb)} • Dist. {formatCurrency(currentMonthData.encaissements_distributeur)}
+                  </p>
                 )}
               </div>
             </div>
@@ -217,69 +192,17 @@ const CashFlow = () => {
                 <TrendingDown className="h-5 w-5 text-destructive" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Décaissements prod. HT (mois)</p>
-                <p className="text-xl font-bold">{formatCurrency(currentMonthData.decaissements_production_ht)}</p>
-                {!isFranchise && currentMonthData.tva_deductible > 0 && (
-                  <p className="text-xs text-muted-foreground">TVA déd.: {formatCurrency(currentMonthData.tva_deductible)}</p>
-                )}
+                <p className="text-sm text-muted-foreground">Décaissements totaux HT</p>
+                <p className="text-xl font-bold">{formatCurrency(summary.total_decaissements_production_ht + summary.total_frais_professionnels_ht + summary.total_investissements + summary.total_remboursements + summary.total_interets)}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Prod. {formatCurrency(summary.total_decaissements_production_ht)} • Frais {formatCurrency(summary.total_frais_professionnels_ht)}
+                  {summary.total_investissements > 0 && ` • Invest. ${formatCurrency(summary.total_investissements)}`}
+                </p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-chart-5/10">
-                <Receipt className="h-5 w-5 text-chart-5" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Frais professionnels HT (mois)</p>
-                <p className="text-xl font-bold">{formatCurrency(currentMonthData.frais_professionnels_ht)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Encaissements by channel */}
-      {(currentMonthData.encaissements_btc > 0 || currentMonthData.encaissements_btb > 0 || currentMonthData.encaissements_distributeur > 0) && (
-        <div className="mb-4 grid gap-4 sm:grid-cols-3">
-          <Card className="border-green-200/50 bg-green-50/50 dark:border-green-900/50 dark:bg-green-950/20">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <Store className="h-4 w-4 text-green-600" />
-                <p className="text-xs text-muted-foreground">Encaissements BTC</p>
-                <span className="text-xs text-muted-foreground ml-auto">{paymentDelays.btc}j</span>
-              </div>
-              <p className="text-lg font-semibold text-green-700 dark:text-green-400">{formatCurrency(currentMonthData.encaissements_btc)}</p>
-            </CardContent>
-          </Card>
-          <Card className="border-blue-200/50 bg-blue-50/50 dark:border-blue-900/50 dark:bg-blue-950/20">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-blue-600" />
-                <p className="text-xs text-muted-foreground">Encaissements BTB</p>
-                <span className="text-xs text-muted-foreground ml-auto">{paymentDelays.btb}j</span>
-              </div>
-              <p className="text-lg font-semibold text-blue-700 dark:text-blue-400">{formatCurrency(currentMonthData.encaissements_btb)}</p>
-            </CardContent>
-          </Card>
-          <Card className="border-orange-200/50 bg-orange-50/50 dark:border-orange-900/50 dark:bg-orange-950/20">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <Truck className="h-4 w-4 text-orange-600" />
-                <p className="text-xs text-muted-foreground">Encaissements Distributeur</p>
-                <span className="text-xs text-muted-foreground ml-auto">{paymentDelays.distributeur}j</span>
-              </div>
-              <p className="text-lg font-semibold text-orange-700 dark:text-orange-400">{formatCurrency(currentMonthData.encaissements_distributeur)}</p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Summary Cards - Row 2: TVA + Soldes */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {!isFranchise && (
           <Card className="border-chart-2/30 bg-chart-2/5">
             <CardContent className="p-6">
@@ -289,56 +212,20 @@ const CashFlow = () => {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground flex items-center gap-1">
-                    TVA nette (mois)
+                    TVA nette annuelle
                     <InfoTooltip {...DEFINITIONS.tva_nette} size="sm" />
                   </p>
-                  <p className={`text-xl font-bold ${currentMonthData.tva_nette >= 0 ? "text-destructive" : "text-primary"}`}>
-                    {currentMonthData.tva_nette >= 0 ? `-${formatCurrency(currentMonthData.tva_nette)}` : `+${formatCurrency(Math.abs(currentMonthData.tva_nette))}`}
+                  <p className={`text-xl font-bold ${summary.total_tva_nette >= 0 ? "text-destructive" : "text-primary"}`}>
+                    {summary.total_tva_nette >= 0 ? `-${formatCurrency(summary.total_tva_nette)}` : `+${formatCurrency(Math.abs(summary.total_tva_nette))}`}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {currentMonthData.tva_nette >= 0 ? "À payer" : "À récupérer"}
+                    {summary.total_tva_nette >= 0 ? "À payer" : "À récupérer"}
                   </p>
                 </div>
               </div>
             </CardContent>
           </Card>
         )}
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                currentMonthData.solde_production >= 0 ? "bg-primary/10" : "bg-destructive/10"
-              }`}>
-                <Wallet className={`h-5 w-5 ${currentMonthData.solde_production >= 0 ? "text-primary" : "text-destructive"}`} />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Solde production (HT)</p>
-                <p className={`text-xl font-bold ${currentMonthData.solde_production >= 0 ? "text-primary" : "text-destructive"}`}>
-                  {currentMonthData.solde_production >= 0 ? "+" : ""}{formatCurrency(currentMonthData.solde_production)}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                currentMonthData.solde_apres_frais >= 0 ? "bg-primary/10" : "bg-destructive/10"
-              }`}>
-                <Wallet className={`h-5 w-5 ${currentMonthData.solde_apres_frais >= 0 ? "text-primary" : "text-destructive"}`} />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Solde après frais (HT)</p>
-                <p className={`text-xl font-bold ${currentMonthData.solde_apres_frais >= 0 ? "text-primary" : "text-destructive"}`}>
-                  {currentMonthData.solde_apres_frais >= 0 ? "+" : ""}{formatCurrency(currentMonthData.solde_apres_frais)}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
         <Card>
           <CardContent className="p-6">
@@ -353,104 +240,15 @@ const CashFlow = () => {
                 <p className={`text-xl font-bold ${summary.solde_final >= 0 ? "" : "text-destructive"}`}>
                   {formatCurrency(summary.solde_final)}
                 </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Variation : {summary.total_variation_tresorerie >= 0 ? "+" : ""}{formatCurrency(summary.total_variation_tresorerie)}
+                  {summary.total_financements > 0 && ` • Fin. +${formatCurrency(summary.total_financements)}`}
+                </p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
-
-      {/* Annual Summary Cards */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">CA annuel reconnu HT</p>
-            <p className="text-lg font-semibold text-chart-3">{formatCurrency(summary.total_ca_ht)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">Encaissements HT</p>
-            <p className="text-lg font-semibold text-primary">{formatCurrency(summary.total_encaissements_ht)}</p>
-            {!isFranchise && (
-              <p className="text-xs text-muted-foreground">TTC: {formatCurrency(summary.total_encaissements_ttc)}</p>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">Coûts production HT</p>
-            <p className="text-lg font-semibold text-destructive">{formatCurrency(summary.total_decaissements_production_ht)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">Frais pro. HT</p>
-            <p className="text-lg font-semibold">{formatCurrency(summary.total_frais_professionnels_ht)}</p>
-          </CardContent>
-        </Card>
-        {!isFranchise && (
-          <Card className="border-chart-2/30">
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground mb-1">TVA nette annuelle</p>
-              <p className={`text-lg font-semibold ${summary.total_tva_nette >= 0 ? "text-destructive" : "text-primary"}`}>
-                {summary.total_tva_nette >= 0 ? `-${formatCurrency(summary.total_tva_nette)}` : `+${formatCurrency(Math.abs(summary.total_tva_nette))}`}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {summary.total_tva_nette >= 0 ? "À payer" : "À récupérer"}
-              </p>
-            </CardContent>
-          </Card>
-        )}
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">Variation trésorerie</p>
-            <p className={`text-lg font-semibold ${summary.total_variation_tresorerie >= 0 ? "text-primary" : "text-destructive"}`}>
-              {summary.total_variation_tresorerie >= 0 ? "+" : ""}{formatCurrency(summary.total_variation_tresorerie)}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Investment & Financing Summary */}
-      {(summary.total_investissements > 0 || summary.total_financements > 0) && (
-        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Landmark className="h-4 w-4 text-destructive" />
-                <p className="text-xs text-muted-foreground">Investissements</p>
-              </div>
-              <p className="text-lg font-semibold text-destructive">-{formatCurrency(summary.total_investissements)}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <CreditCard className="h-4 w-4 text-primary" />
-                <p className="text-xs text-muted-foreground">Financements reçus</p>
-              </div>
-              <p className="text-lg font-semibold text-primary">+{formatCurrency(summary.total_financements)}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground mb-1">Remboursements prêts</p>
-              <p className="text-lg font-semibold text-destructive">
-                {summary.total_remboursements > 0 ? `-${formatCurrency(summary.total_remboursements)}` : '0 €'}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground mb-1">Intérêts payés</p>
-              <p className="text-lg font-semibold text-destructive">
-                {summary.total_interets > 0 ? `-${formatCurrency(summary.total_interets)}` : '0 €'}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
       {/* Chart - Treasury Evolution */}
       {hasData && (
         <Card className="mb-8">

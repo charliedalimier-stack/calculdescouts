@@ -32,16 +32,19 @@ export interface MonthlyTVA {
   resultatTresorerie: number;
 }
 
-export function useTVA(month?: string) {
+export function useTVA(options?: { month?: string; year?: number; mode?: string }) {
   const { currentProject } = useProject();
-  const { mode } = useMode();
+  const { mode: contextMode } = useMode();
   const { settings } = useProjectSettings();
+  const mode = options?.mode || contextMode;
+  const month = options?.month;
+  const year = options?.year;
 
   const projectId = currentProject?.id;
 
   // Fetch products with sales for TVA collectée calculation
   const { data: salesData = [] } = useQuery({
-    queryKey: ["tva-sales", projectId, mode, month],
+    queryKey: ["tva-sales", projectId, mode, month, year],
     queryFn: async () => {
       if (!projectId) return [];
 
@@ -61,6 +64,8 @@ export function useTVA(month?: string) {
 
       if (month) {
         query = query.eq("mois", month);
+      } else if (year) {
+        query = query.gte("mois", `${year}-01-01`).lte("mois", `${year}-12-31`);
       }
 
       const { data, error } = await query;
@@ -262,23 +267,34 @@ export function calculateTVA(montantHT: number, tauxTVA: number): number {
 }
 
 // Hook for monthly TVA tracking
-export function useMonthlyTVA() {
+export function useMonthlyTVA(options?: { year?: number; mode?: string }) {
   const { currentProject } = useProject();
   const { settings } = useProjectSettings();
 
   const projectId = currentProject?.id;
+  const year = options?.year;
+  const mode = options?.mode;
 
   const { data: monthlyData = [], isLoading } = useQuery({
-    queryKey: ["monthly-tva", projectId],
+    queryKey: ["monthly-tva", projectId, year, mode],
     queryFn: async () => {
       if (!projectId) return [];
 
       // Get cash flow data with TVA
-      const { data: cashFlowData, error } = await supabase
+      let query = supabase
         .from("cash_flow")
         .select("*")
         .eq("project_id", projectId)
         .order("mois", { ascending: true });
+
+      if (year) {
+        query = query.gte("mois", `${year}-01-01`).lte("mois", `${year}-12-31`);
+      }
+      if (mode) {
+        query = query.eq("mode", mode);
+      }
+
+      const { data: cashFlowData, error } = await query;
 
       if (error) throw error;
 

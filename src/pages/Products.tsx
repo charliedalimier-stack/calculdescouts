@@ -39,6 +39,7 @@ import { Card } from "@/components/ui/card";
 import { useProducts } from "@/hooks/useProducts";
 import { useCategories } from "@/hooks/useCategories";
 import { useProject } from "@/contexts/ProjectContext";
+import { useProjectSettings } from "@/hooks/useProjectSettings";
 
 const getMarginBadge = (margin: number) => {
   if (margin >= 40) {
@@ -53,6 +54,7 @@ const Products = () => {
   const { currentProject } = useProject();
   const { productsWithCosts, isLoading, addProduct, updateProduct, deleteProduct } = useProducts();
   const { categories, addCategory } = useCategories();
+  const { settings } = useProjectSettings();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -62,6 +64,7 @@ const Products = () => {
     categorie_id: "",
     unite_vente: "pièce",
     prix_btc: "",
+    tva_taux: "",
   });
   const [newCategory, setNewCategory] = useState("");
 
@@ -75,17 +78,19 @@ const Products = () => {
   });
 
   const resetForm = () => {
-    setFormData({ nom_produit: "", categorie_id: "", unite_vente: "pièce", prix_btc: "" });
+    setFormData({ nom_produit: "", categorie_id: "", unite_vente: "pièce", prix_btc: "", tva_taux: "" });
     setEditingId(null);
     setNewCategory("");
   };
 
   const handleSubmit = () => {
+    const tvaValue = formData.tva_taux !== "" ? parseFloat(formData.tva_taux) : (settings?.tva_vente ?? 6);
     const data = {
       nom_produit: formData.nom_produit.trim(),
       categorie_id: formData.categorie_id || null,
       unite_vente: formData.unite_vente.trim(),
       prix_btc: parseFloat(formData.prix_btc) || 0,
+      tva_taux: tvaValue,
     };
 
     const error = getValidationError(productSchema, data);
@@ -110,6 +115,7 @@ const Products = () => {
       categorie_id: product.categorie_id || "",
       unite_vente: product.unite_vente,
       prix_btc: product.prix_btc.toString(),
+      tva_taux: product.tva_taux != null ? product.tva_taux.toString() : "",
     });
     setEditingId(product.id);
     setIsDialogOpen(true);
@@ -238,6 +244,29 @@ const Products = () => {
                   value={formData.prix_btc}
                   onChange={(e) => setFormData({ ...formData, prix_btc: e.target.value })}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="tvaTaux">Taux TVA (%)</Label>
+                <Select
+                  value={formData.tva_taux || (settings?.tva_vente ?? 6).toString()}
+                  onValueChange={(value) => setFormData({ ...formData, tva_taux: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">0% - Exonéré</SelectItem>
+                    <SelectItem value={(settings?.tva_reduit_2 ?? 6).toString()}>
+                      {settings?.tva_reduit_2 ?? 6}% - Réduit (produits de base)
+                    </SelectItem>
+                    <SelectItem value={(settings?.tva_reduit_1 ?? 12).toString()}>
+                      {settings?.tva_reduit_1 ?? 12}% - Réduit (transformés)
+                    </SelectItem>
+                    <SelectItem value={(settings?.tva_standard ?? 21).toString()}>
+                      {settings?.tva_standard ?? 21}% - Standard
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <p className="text-xs text-muted-foreground">
                 Les prix BTB (×0.70) et Distributeur (×0.85 du BTB) sont calculés automatiquement.

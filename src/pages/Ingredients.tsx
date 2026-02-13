@@ -31,10 +31,19 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { useIngredients } from "@/hooks/useIngredients";
 import { useProject } from "@/contexts/ProjectContext";
+import { useProjectSettings } from "@/hooks/useProjectSettings";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const Ingredients = () => {
   const { currentProject } = useProject();
   const { ingredients, isLoading, addIngredient, updateIngredient, deleteIngredient } = useIngredients();
+  const { settings } = useProjectSettings();
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -43,6 +52,7 @@ const Ingredients = () => {
     cout_unitaire: "",
     unite: "kg",
     fournisseur: "",
+    tva_taux: "",
   });
 
   const filteredIngredients = ingredients.filter((ing) =>
@@ -50,16 +60,18 @@ const Ingredients = () => {
   );
 
   const resetForm = () => {
-    setFormData({ nom_ingredient: "", cout_unitaire: "", unite: "kg", fournisseur: "" });
+    setFormData({ nom_ingredient: "", cout_unitaire: "", unite: "kg", fournisseur: "", tva_taux: "" });
     setEditingId(null);
   };
 
   const handleSubmit = () => {
+    const tvaValue = formData.tva_taux !== "" ? parseFloat(formData.tva_taux) : (settings?.tva_achat ?? 21);
     const data = {
       nom_ingredient: formData.nom_ingredient.trim(),
       cout_unitaire: parseFloat(formData.cout_unitaire) || 0,
       unite: formData.unite.trim(),
       fournisseur: formData.fournisseur?.trim() || null,
+      tva_taux: tvaValue,
     };
 
     const error = getValidationError(ingredientSchema, data);
@@ -84,6 +96,7 @@ const Ingredients = () => {
       cout_unitaire: ingredient.cout_unitaire.toString(),
       unite: ingredient.unite,
       fournisseur: ingredient.fournisseur || "",
+      tva_taux: ingredient.tva_taux != null ? ingredient.tva_taux.toString() : "",
     });
     setEditingId(ingredient.id);
     setIsDialogOpen(true);
@@ -169,6 +182,29 @@ const Ingredients = () => {
                   value={formData.fournisseur}
                   onChange={(e) => setFormData({ ...formData, fournisseur: e.target.value })}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="tvaTaux">Taux TVA (%)</Label>
+                <Select
+                  value={formData.tva_taux || (settings?.tva_achat ?? 21).toString()}
+                  onValueChange={(value) => setFormData({ ...formData, tva_taux: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">0% - Exonéré</SelectItem>
+                    <SelectItem value={(settings?.tva_reduit_2 ?? 6).toString()}>
+                      {settings?.tva_reduit_2 ?? 6}% - Réduit (produits de base)
+                    </SelectItem>
+                    <SelectItem value={(settings?.tva_reduit_1 ?? 12).toString()}>
+                      {settings?.tva_reduit_1 ?? 12}% - Réduit (transformés)
+                    </SelectItem>
+                    <SelectItem value={(settings?.tva_standard ?? 21).toString()}>
+                      {settings?.tva_standard ?? 21}% - Standard
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <Button
                 className="w-full"

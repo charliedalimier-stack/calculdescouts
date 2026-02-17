@@ -3,6 +3,8 @@ import { format, parse, startOfMonth } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
 import { expenseSchema, getValidationError } from "@/lib/validations";
+import { useMode } from "@/contexts/ModeContext";
+import { Target, BarChart3 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -93,6 +95,8 @@ const Expenses = () => {
   });
   const [duplicateSource, setDuplicateSource] = useState("");
   const [duplicateTarget, setDuplicateTarget] = useState("");
+
+  const { mode, setMode } = useMode();
 
   const {
     expenses,
@@ -291,6 +295,20 @@ const Expenses = () => {
       <Card className="mb-6">
         <CardContent className="pt-6">
           <div className="flex flex-wrap items-center gap-4">
+            {/* Budget / Réel Selector */}
+            <Tabs value={mode} onValueChange={(v) => setMode(v as 'budget' | 'reel')}>
+              <TabsList className="border border-primary/20">
+                <TabsTrigger value="budget" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  <Target className="h-4 w-4" />
+                  Budget
+                </TabsTrigger>
+                <TabsTrigger value="reel" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  <BarChart3 className="h-4 w-4" />
+                  Réel
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "monthly" | "annual")}>
               <TabsList>
                 <TabsTrigger value="monthly">

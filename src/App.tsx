@@ -31,6 +31,7 @@ import Settings from "./pages/Settings";
 import Reports from "./pages/Reports";
 import Investments from "./pages/Investments";
 import Explanations from "./pages/Explanations";
+import SelectActivity from "./pages/SelectActivity";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,6 +47,7 @@ const App = () => (
             <BrowserRouter>
               <Routes>
                 <Route path="/auth" element={<Auth />} />
+                <Route path="/select-activity" element={<ProtectedRoute><SelectActivity /></ProtectedRoute>} />
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 <Route path="/plan-financier" element={<ProtectedRoute><PlanFinancier /></ProtectedRoute>} />
                 <Route path="/budget-vs-reel" element={<Navigate to="/plan-financier" replace />} />

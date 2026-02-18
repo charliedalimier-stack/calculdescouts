@@ -28,7 +28,7 @@ const Auth = () => {
   // Redirect if authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      navigate("/", { replace: true });
+      navigate("/select-activity", { replace: true });
     }
   }, [isAuthenticated, navigate]);
 

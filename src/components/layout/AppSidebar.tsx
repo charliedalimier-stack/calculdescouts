@@ -22,7 +22,7 @@ import {
   Briefcase,
   LogOut,
   User,
-  
+  ArrowLeftRight,
   FileSpreadsheet,
   Landmark,
   HelpCircle,
@@ -161,6 +161,14 @@ export function AppSidebar() {
               <Link to="/settings">
                 <Settings className="h-4 w-4" />
                 <span>Paramètres</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <Link to="/select-activity">
+                <ArrowLeftRight className="h-4 w-4" />
+                <span>Changer d'activité</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

@@ -166,10 +166,10 @@ export function AppSidebar() {
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
-              <Link to="/select-activity">
+              <a href={STARTER_APP_URL}>
                 <ArrowLeftRight className="h-4 w-4" />
                 <span>Changer d'activité</span>
-              </Link>
+              </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>

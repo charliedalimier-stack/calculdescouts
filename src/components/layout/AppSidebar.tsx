@@ -28,6 +28,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
+import { STARTER_APP_URL } from "@/lib/config";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -166,10 +167,10 @@ export function AppSidebar() {
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
-              <Link to="/select-activity">
+              <a href={STARTER_APP_URL}>
                 <ArrowLeftRight className="h-4 w-4" />
                 <span>Changer d'activité</span>
-              </Link>
+              </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>

@@ -28,6 +28,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
+import { STARTER_APP_URL } from "@/lib/config";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {

@@ -1,53 +1,28 @@
 
 
-# Plan : Page de selection d'activite avec redirection
+# Redirection "Changer d'activite" vers StartFood
 
 ## Objectif
 
-Ajouter une page intermediaire apres la connexion qui permet a l'utilisateur de choisir entre **Transformation alimentaire** et **Restauration**, puis de le rediriger vers l'application correspondante.
+Modifier le lien "Changer d'activite" dans la sidebar pour rediriger vers l'application externe **https://starterfood.lovable.app/select-activity** au lieu de la route interne `/select-activity`.
 
-L'application actuelle reste dediee a la transformation alimentaire. L'application restaurant sera un projet separe (remix). La page de selection sert de point d'entree commun.
+## Modification
 
-## Fonctionnement
+### Fichier : `src/components/layout/AppSidebar.tsx`
 
-1. L'utilisateur se connecte sur `/auth`
-2. Il est redirige vers `/select-activity` (au lieu de `/` directement)
-3. Il voit deux grandes cartes cliquables :
-   - **Transformation alimentaire** → redirige vers `/` (tableau de bord actuel)
-   - **Restauration** → redirige vers une URL externe (l'application remixee, configurable)
-4. Un bouton "Retour au choix" sera accessible depuis le menu pour revenir a cette page
+Remplacer le `<Link to="/select-activity">` par un lien externe utilisant `window.location.href` ou une balise `<a>` pointant vers `https://starterfood.lovable.app/select-activity`.
 
-## Details techniques
+### Fichier : `src/lib/config.ts`
 
-### Nouveau fichier : `src/pages/SelectActivity.tsx`
+Ajouter une constante `STARTER_APP_URL` pour centraliser l'URL de l'application StartFood, facilitant les modifications futures.
 
-- Page plein ecran avec deux cartes visuelles (icones ChefHat et UtensilsCrossed)
-- Descriptions courtes pour chaque activite
-- Clic sur "Transformation" → `navigate("/")`
-- Clic sur "Restauration" → `window.location.href` vers l'URL externe (ou message "Bientot disponible" si pas encore deployee)
-- L'URL du projet restaurant sera stockee dans une constante facilement modifiable
+### Nettoyage optionnel
 
-### Modification : `src/pages/Auth.tsx`
+La route interne `/select-activity` dans `App.tsx` et la page `src/pages/SelectActivity.tsx` peuvent etre conservees ou supprimees selon votre preference, puisque la selection se fera desormais depuis l'application StartFood.
 
-- Changer la redirection apres connexion de `/` vers `/select-activity`
-
-### Modification : `src/App.tsx`
-
-- Ajouter la route `/select-activity` (protegee par ProtectedRoute)
-
-### Modification : `src/components/layout/AppSidebar.tsx`
-
-- Ajouter un lien "Changer d'activite" dans le footer du menu, avant la deconnexion, qui redirige vers `/select-activity`
-
-### Configuration
-
-- Une constante `RESTAURANT_APP_URL` sera definie dans un fichier de configuration
-- Tant que le projet restaurant n'est pas deploye, le bouton affichera "Bientot disponible" avec un style desactive
-
-## Ce qui ne change pas
+## Impact
 
 - Aucune modification de la base de donnees
-- Aucune modification de la logique metier existante
-- Toutes les pages actuelles restent identiques
-- L'application reste 100% dediee a la transformation alimentaire
+- Aucune modification de la logique metier
+- Seul le comportement du lien "Changer d'activite" change : redirection externe au lieu de navigation interne
 
